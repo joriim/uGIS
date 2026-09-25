@@ -40,6 +40,7 @@ It is designed **API-first**: every user action is a *tool* defined in `schema/t
 - **ToolDispatcher** validates input against `schema/tools.json`, then calls `ufield/core`. UI, voice and MCP all go through it.
 - **StorageProvider** is an interface (`list`, `read`, `write`, `delete`, `changes_since`, `conflict_policy`). MVP: Local and GoogleDrive. OneDrive and MerginCE after.
 - **Layers** come from `config/layers.yaml` (type, url, crs, license, attribution, auth). `scripts/check_layers.py` checks every endpoint in CI.
+- **Target areas** (`select_target_area`) are what the Farm Pack and products are built for: saved areas made of field parcels (peltolohkotunnus, Ruokavirasto), properties (kiinteistötunnus, MML) or map picks, each classed as field, forest, other green, brownfield or urban green. See `docs/adr/0001-target-areas.md`.
 - **Farm Pack** is the one product built in the MVP (`request_farm_pack`): server-side fetch of MML ortho/DEM (WCS, tiled at 2 × 2 km), a CDSE openEO Sentinel-2 season series and clipped open vector layers, delivered as GeoPackage + COGs + STAC. Sources and limits: `docs/layer-sources.md`.
 - **Other products** (orthomosaic, 3DGS, super-resolution) are **not implemented in the MVP**. `request_product` validates input, records a `ProductJob` with status `unavailable`, and returns it. Don't build workers until asked.
 
@@ -78,6 +79,6 @@ docs/                ADRs (docs/adr/NNNN-title.md), play-policy.md, dependencies
 
 ## MVP scope
 
-In: fork + rebrand, CI build, Google sign-in, Local + Google Drive storage, observations (text, number, photo, video) with full capture metadata, open QGIS project, layer registry with open layers, Farm Pack, STAC catalog, tool schema, MCP server, voice input (Finnish + English), signed AAB release to Play internal track.
+In: fork + rebrand, CI build, Google sign-in, Local + Google Drive storage, observations (text, number, photo, video) with full capture metadata, open QGIS project, layer registry with open layers, target areas (peltolohkotunnus, kiinteistötunnus, map pick), Farm Pack, STAC catalog, tool schema, MCP server, voice input (Finnish + English), signed AAB release to Play internal track.
 
 Out (interfaces only): product generation (ortho, 3DGS, super-resolution), OneDrive, MerginCE sync, multi-user collaboration.

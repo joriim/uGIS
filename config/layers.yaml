@@ -9,6 +9,8 @@
 #   auth         none | mml_api_key | cdse_oauth  (secrets live on ufield-server, never in the app)
 #   via_server   true = the app must go through ufield-server (key hiding, caching, tiling)
 #   farm_pack    role in the Farm Pack product, or null
+#   target_area  field_parcel | property: this layer resolves ids for select_target_area
+#   id_attribute attribute holding the id used by target_area (peltolohkotunnus / kiinteistötunnus)
 #   license / attribution  shown in the app and written into STAC items
 #   verified     date the endpoint was last checked by scripts/check_layers.py
 
@@ -136,6 +138,20 @@ layers:
     via_server: true
     farm_pack: null            # later: LiDAR for 3D products
 
+  - id: mml_kiinteistot
+    title: Kiinteistöjaotus (palstat ja kiinteistötunnukset)
+    provider: mml
+    category: cadastre
+    type: ogcapi_features
+    url: https://avoin-paikkatieto.maanmittauslaitos.fi/kiinteisto-avoin/simple-features/v3/   # TODO: verify path
+    layers: []                 # TODO: fill collection id for palstat (property parcels) from /collections
+    id_attribute: null         # TODO: attribute holding kiinteistötunnus; a property can have several palstat
+    crs: EPSG:3067
+    auth: mml_api_key
+    via_server: true
+    farm_pack: null
+    target_area: property
+
   - id: mml_maastotiedot
     title: Maastotietokanta (kohteet)
     provider: mml
@@ -159,6 +175,8 @@ layers:
     auth: none
     via_server: false
     farm_pack: parcels
+    target_area: field_parcel
+    id_attribute: null         # TODO: attribute holding peltolohkotunnus; confirm from DescribeFeatureType
 
   - id: ruokavirasto_kasvulohkot
     title: Kasvulohkot

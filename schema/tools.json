@@ -48,6 +48,23 @@
 
     "visibility": { "enum": ["proprietary", "public"] },
 
+    "field_parcel_id": {
+      "type": "string",
+      "pattern": "^[0-9]{10}$",
+      "description": "Ruokavirasto peltolohkotunnus (field parcel id), 10 digits, e.g. '0350123456'."
+    },
+
+    "property_id": {
+      "type": "string",
+      "pattern": "^([0-9]{1,3}-[0-9]{1,3}-[0-9]{1,4}-[0-9]{1,4}|[0-9]{14})$",
+      "description": "MML kiinteistötunnus (property id), either dashed '91-403-1-123' / '091-403-0001-0123' or the 14-digit long form '09140300010123'. Normalised to the long form. Määräalat (unseparated parcels, '-M' suffix) are not supported."
+    },
+
+    "area_class": {
+      "enum": ["field", "forest", "other_green", "brownfield", "urban_green", "unclassified"],
+      "description": "Kind of land in a target area part: field (pelto), forest (metsä), other_green (muu viheralue: meadow, pasture, wetland), brownfield (ruskea alue: former industrial, contaminated or extraction land), urban_green (kaupunkivihreä: parks, yards, street green), unclassified."
+    },
+
     "attributes": {
       "type": "object",
       "description": "Feature attributes as field name → value. Must match the target layer's fields.",
@@ -242,19 +259,91 @@
       }
     },
     {
+      "name": "select_target_area",
+      "description": "Create or edit a target area: the area a Farm Pack or product is built for. Select parts by Ruokavirasto peltolohkotunnus, by MML kiinteistötunnus, or by picking the parcel or property under map points. Give at least one of field_parcel_ids, property_ids or pick_at. Each id is resolved to its boundary; the area's geometry is the union of its parts. Returns the area with its parts (id, source, area_class, hectares), total hectares, and any ids that were not found.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target_area_id": { "$ref": "#/$defs/id", "description": "Area to edit. Omit to create a new area." },
+          "name": { "type": "string", "minLength": 1, "maxLength": 120, "description": "Display name, e.g. 'Kotitila' or 'Puistoalue 3'." },
+          "field_parcel_ids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/field_parcel_id" },
+            "minItems": 1,
+            "maxItems": 500,
+            "uniqueItems": true
+          },
+          "property_ids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/property_id" },
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "pick_at": {
+            "type": "array",
+            "description": "Map points (EPSG:4326); the field parcel or property under each point is selected. Used by map taps.",
+            "items": {
+              "type": "object",
+              "required": ["lat", "lon"],
+              "properties": {
+                "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+                "lon": { "type": "number", "minimum": -180, "maximum": 180 }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "pick_layer": { "enum": ["field_parcel", "property"], "default": "field_parcel", "description": "What pick_at selects." },
+          "area_class": { "$ref": "#/$defs/area_class", "description": "Class for the parts added in this call. Defaults to 'field' for field parcels and 'unclassified' for properties." },
+          "mode": { "enum": ["add", "remove", "replace"], "default": "add", "description": "How the given parts change an existing area. Ignored when creating." },
+          "field_parcel_year": { "type": "integer", "minimum": 2020, "description": "Parcel register year used to resolve peltolohkotunnus; defaults to the latest available." },
+          "visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_target_areas",
+      "description": "List the user's target areas with name, classes, total hectares and part count.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Free-text filter on name, peltolohkotunnus or kiinteistötunnus." },
+          "area_class": { "$ref": "#/$defs/area_class" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "delete_target_area",
+      "description": "Delete a target area. Products already built from it are kept. Requires explicit confirmation; LLM and voice clients must ask the user first.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["target_area_id", "confirm"],
+        "properties": {
+          "target_area_id": { "$ref": "#/$defs/id" },
+          "confirm": { "const": true }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "request_farm_pack",
-      "description": "Build a Farm Pack for one farm: orthophotos, elevation, a Sentinel-2 season series and clipped open vector layers, packaged as GeoPackage + COGs + STAC. Runs on the server; returns a job to poll with get_job_status. Available in the MVP.",
+      "description": "Build a Farm Pack for one target area (fields, forest, other green, brownfield or urban green land): orthophotos, elevation, a Sentinel-2 season series and clipped open vector layers, packaged as GeoPackage + COGs + STAC. Give target_area_id (see select_target_area) or a drawn aoi. Runs on the server; returns a job to poll with get_job_status. Available in the MVP.",
       "inputSchema": {
         "type": "object",
         "oneOf": [
-          { "required": ["parcel_ids"] },
+          { "required": ["target_area_id"] },
           { "required": ["aoi"] }
         ],
         "properties": {
-          "parcel_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Ruokavirasto field parcel ids; the farm AOI is their union." },
-          "aoi": { "$ref": "#/$defs/geometry" },
+          "target_area_id": { "$ref": "#/$defs/id", "description": "Target area from select_target_area; the pack AOI is the union of its parts." },
+          "aoi": { "$ref": "#/$defs/geometry", "description": "Drawn boundary, when no target area is used." },
           "buffer_m": { "type": "number", "minimum": 0, "maximum": 500, "default": 20 },
-          "parcel_year": { "type": "integer", "minimum": 2020, "description": "Parcel register year; defaults to latest available." },
+          "parcel_year": { "type": "integer", "minimum": 2020, "description": "Parcel register year for the parcels content; defaults to the target area's field_parcel_year, else the latest available." },
           "season_from": { "type": "string", "format": "date" },
           "season_to": { "type": "string", "format": "date" },
           "max_cloud_pct": { "type": "number", "minimum": 0, "maximum": 100, "default": 20 },
@@ -279,6 +368,7 @@
           "product_type": { "enum": ["orthomosaic", "gaussian_splat_3d", "super_resolution", "dem", "index_map"] },
           "input_asset_ids": { "type": "array", "items": { "$ref": "#/$defs/id" }, "minItems": 1 },
           "aoi": { "$ref": "#/$defs/geometry" },
+          "target_area_id": { "$ref": "#/$defs/id", "description": "Limit the product to a target area instead of an aoi." },
           "parameters": { "type": "object", "description": "Recipe-specific parameters." },
           "output_visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
         },

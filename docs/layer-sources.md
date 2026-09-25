@@ -4,7 +4,7 @@ Status: research draft, 2026-09-24. Put at `docs/layer-sources.md`. Machine-read
 
 ## 1. Goal for the MVP: the Farm Pack
 
-The first integrated service is a **Farm Pack**: one consumer-friendly bundle of imagery and base data that covers a single large farm (typically 50–1,000 ha). The user picks their parcels on the map (or draws a boundary); the server returns a ready-to-open package for the phone and QGIS.
+The first integrated service is a **Farm Pack**: one consumer-friendly bundle of imagery and base data that covers one target area, typically a single large farm (50–1,000 ha). The user builds the target area from field parcels (peltolohkotunnus), properties (kiinteistötunnus) or map taps, or draws a boundary; the server returns a ready-to-open package for the phone and QGIS. Target areas can be fields, forest, other green land, brownfields or urban green areas; see `docs/adr/0001-target-areas.md`.
 
 Farm Pack is the first real `ProductJob` (`product_type: farm_pack`). Orthomosaics, 3DGS and super-resolution stay unimplemented.
 
@@ -47,6 +47,7 @@ Rough size for a 500 ha farm in a 4 × 3 km bounding box (estimate, to be measur
 - **Orthophoto and elevation query service (WCS):** `https://avoin-karttakuva.maanmittauslaitos.fi/ortokuvat-ja-korkeusmallit/wcs/v2`. Colour, black-and-white and false-colour orthophotos at 0.5 m; DEM 2 m. Limits per request: orthophotos 2,000 × 2,000 m and 4,000 px; DEM 10,000 × 10,000 m and 5,000 px. GeoTIFF output; EPSG:3067, GK zones or 3857.
 - **File service (OGC API Processes):** clip by bbox or polygon; orthophotos (JPEG2000), DEM 2 m / 10 m, laser scanning point clouds (LAZ), Maastotietokanta, property maps, 3D buildings. EPSG:3067 only. No area limit documented. Good for LiDAR in later 3D products.
 - **OGC API Features:** topographic database (`https://avoin-paikkatieto.maanmittauslaitos.fi/maastotiedot/features/v1/`) and property data.
+- **Property boundaries (kiinteistöjaotus):** palstat with their kiinteistötunnus, used to resolve target areas selected by property id (`mml_kiinteistot` in the registry; endpoint path and collection id still to be confirmed). Owner data is not open and is not used.
 - **Licence:** open data, CC BY 4.0 (attribution: Maanmittauslaitos).
 
 ### Ruokavirasto (Finnish Food Authority)
@@ -56,6 +57,7 @@ Rough size for a 500 ha farm in a 4 × 3 km bounding box (estimate, to be measur
 - **WFS:** `https://inspire.ruokavirasto-awsa.com/geoserver/wfs`. Feature types per year, for example `inspire:LC.LandCoverSurfaces.LPIS.2025` (field parcels) and `inspire:LandUse.ExistingLandUse.GSAAAgriculturalParcel.2025` (plant parcels). Native CRS EPSG:3067; JSON output supported.
 - **Downloads:** `https://download.inspire.ruokavirasto-awsa.com/data/<YEAR>/<DATASET>.gpkg` and an Atom feed.
 - **Licence:** CC BY 4.0.
+- **Target areas:** field parcels are selected by peltolohkotunnus (10 digits) from the field parcel layer of the chosen year.
 - **Note:** layer names contain the year. The registry should resolve "latest year" at runtime instead of hard-coding it.
 
 ### GTK (Geological Survey of Finland)
