@@ -87,3 +87,5 @@ docs/                ADRs (docs/adr/NNNN-title.md), play-policy.md, dependencies
 In: fork + rebrand, CI build, Google sign-in, Local + Google Drive storage, observations (text, number, photo, video) with full capture metadata, open QGIS project, layer registry with open layers, target areas (peltolohkotunnus, kiinteistötunnus, map pick), Farm Pack, STAC catalog, tool schema, MCP server, voice input (Finnish + English), signed AAB release to Play internal track.
 
 Out (interfaces only): product generation (ortho, 3DGS, super-resolution), OneDrive, MerginCE sync, multi-user collaboration.
+
+Phases, exit checks and release steps for GitHub and Google Play: `docs/roadmap.md`.
