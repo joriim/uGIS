@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ufield.biomitta.fi/schema/tools.json",
+  "title": "μField tool schema",
+  "description": "Single source of truth for every μField action. Used by the app UI (ToolDispatcher), the MCP server and the voice agent. Each entry maps directly to an MCP tool (name, description, inputSchema).",
+  "version": "0.1.0",
+
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,64}$" },
+
+    "position": {
+      "type": "object",
+      "description": "GNSS position as captured by the device.",
+      "required": ["lat", "lon"],
+      "properties": {
+        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+        "lon": { "type": "number", "minimum": -180, "maximum": 180 },
+        "alt_m": { "type": "number" },
+        "h_accuracy_m": { "type": "number", "minimum": 0 },
+        "v_accuracy_m": { "type": "number", "minimum": 0 },
+        "fix_type": { "enum": ["none", "gps", "dgps", "rtk_float", "rtk_fixed", "manual"] },
+        "satellites": { "type": "integer", "minimum": 0 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+
+    "orientation": {
+      "type": "object",
+      "description": "Device orientation at capture, degrees.",
+      "properties": {
+        "azimuth": { "type": "number", "minimum": 0, "maximum": 360 },
+        "pitch": { "type": "number", "minimum": -180, "maximum": 180 },
+        "roll": { "type": "number", "minimum": -180, "maximum": 180 }
+      },
+      "additionalProperties": false
+    },
+
+    "geometry": {
+      "type": "object",
+      "description": "GeoJSON geometry in EPSG:4326.",
+      "required": ["type", "coordinates"],
+      "properties": {
+        "type": { "enum": ["Point", "LineString", "Polygon", "MultiPoint", "MultiLineString", "MultiPolygon"] },
+        "coordinates": { "type": "array" }
+      }
+    },
+
+    "visibility": { "enum": ["proprietary", "public"] },
+
+    "attributes": {
+      "type": "object",
+      "description": "Feature attributes as field name → value. Must match the target layer's fields.",
+      "additionalProperties": { "type": ["string", "number", "integer", "boolean", "null"] }
+    },
+
+    "bbox": {
+      "type": "array",
+      "description": "[minLon, minLat, maxLon, maxLat] in EPSG:4326.",
+      "items": { "type": "number" },
+      "minItems": 4,
+      "maxItems": 4
+    }
+  },
+
+  "tools": [
+    {
+      "name": "list_projects",
+      "description": "List μField/QGIS projects available in the user's connected storage.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storage": { "enum": ["local", "google_drive", "onedrive", "mergin_ce", "all"], "default": "all" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "open_project",
+      "description": "Open a project so later tools act on it. Returns its layers and editable fields.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["project_id"],
+        "properties": { "project_id": { "$ref": "#/$defs/id" } },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_location",
+      "description": "Get the device's current position, accuracy and fix type. Use before recording an observation 'here'.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "min_accuracy_m": { "type": "number", "minimum": 0, "description": "Wait until horizontal accuracy is at least this good." },
+          "timeout_s": { "type": "integer", "minimum": 1, "maximum": 300, "default": 30 }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_layers",
+      "description": "List layers in the open project and in the layer registry (open data sources), with licence and attribution.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": { "enum": ["project", "registry", "all"], "default": "all" },
+          "query": { "type": "string", "description": "Free-text filter, e.g. 'peltolohkot' or 'maaperä'." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "add_layer",
+      "description": "Add a layer to the open project, either from the registry by id or from a service URL.",
+      "inputSchema": {
+        "type": "object",
+        "oneOf": [
+          { "required": ["registry_id"] },
+          { "required": ["url", "service_type"] }
+        ],
+        "properties": {
+          "registry_id": { "$ref": "#/$defs/id" },
+          "url": { "type": "string", "format": "uri" },
+          "service_type": { "enum": ["wms", "wmts", "wfs", "xyz", "cog", "geopackage"] },
+          "layer_name": { "type": "string" },
+          "visible": { "type": "boolean", "default": true }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "add_observation",
+      "description": "Record a new feature (observation) in a layer of the open project. Location defaults to the current device position.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["layer_id", "attributes"],
+        "properties": {
+          "layer_id": { "$ref": "#/$defs/id" },
+          "attributes": { "$ref": "#/$defs/attributes" },
+          "geometry": { "$ref": "#/$defs/geometry" },
+          "use_current_location": { "type": "boolean", "default": true },
+          "note": { "type": "string", "description": "Free-text note, e.g. transcribed voice input." },
+          "visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "attach_media",
+      "description": "Capture or attach a photo, video or audio clip to a feature. Originals are stored unmodified with full capture metadata.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["feature_id", "media_type"],
+        "properties": {
+          "feature_id": { "$ref": "#/$defs/id" },
+          "media_type": { "enum": ["photo", "video", "audio"] },
+          "source": { "enum": ["capture", "existing_file"], "default": "capture" },
+          "file_ref": { "type": "string", "description": "Path or storage URI when source is existing_file." },
+          "caption": { "type": "string" },
+          "record_pose_track": { "type": "boolean", "default": true, "description": "For video: store per-frame position and orientation." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "query_features",
+      "description": "Find features in the open project by layer, area, time or attribute filter.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "layer_id": { "$ref": "#/$defs/id" },
+          "bbox": { "$ref": "#/$defs/bbox" },
+          "near": {
+            "type": "object",
+            "required": ["lat", "lon", "radius_m"],
+            "properties": {
+              "lat": { "type": "number" },
+              "lon": { "type": "number" },
+              "radius_m": { "type": "number", "minimum": 0 }
+            }
+          },
+          "time_from": { "type": "string", "format": "date-time" },
+          "time_to": { "type": "string", "format": "date-time" },
+          "filter": { "type": "string", "description": "QGIS expression, e.g. \"ph < 6\"." },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "update_feature",
+      "description": "Change attributes or geometry of an existing feature.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["feature_id"],
+        "properties": {
+          "feature_id": { "$ref": "#/$defs/id" },
+          "attributes": { "$ref": "#/$defs/attributes" },
+          "geometry": { "$ref": "#/$defs/geometry" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "delete_feature",
+      "description": "Delete a feature. Requires explicit confirmation; LLM and voice clients must ask the user first.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["feature_id", "confirm"],
+        "properties": {
+          "feature_id": { "$ref": "#/$defs/id" },
+          "confirm": { "const": true }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sync_project",
+      "description": "Synchronise the open project with its storage provider. Returns changed items and any conflicts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "direction": { "enum": ["both", "push", "pull"], "default": "both" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "search_catalog",
+      "description": "Search the STAC asset catalog (captures, imported layers, products) with provenance and licence.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bbox": { "$ref": "#/$defs/bbox" },
+          "time_from": { "type": "string", "format": "date-time" },
+          "time_to": { "type": "string", "format": "date-time" },
+          "asset_kind": { "enum": ["capture", "layer", "product", "any"], "default": "any" },
+          "visibility": { "enum": ["proprietary", "public", "any"], "default": "any" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "request_farm_pack",
+      "description": "Build a Farm Pack for one farm: orthophotos, elevation, a Sentinel-2 season series and clipped open vector layers, packaged as GeoPackage + COGs + STAC. Runs on the server; returns a job to poll with get_job_status. Available in the MVP.",
+      "inputSchema": {
+        "type": "object",
+        "oneOf": [
+          { "required": ["parcel_ids"] },
+          { "required": ["aoi"] }
+        ],
+        "properties": {
+          "parcel_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Ruokavirasto field parcel ids; the farm AOI is their union." },
+          "aoi": { "$ref": "#/$defs/geometry" },
+          "buffer_m": { "type": "number", "minimum": 0, "maximum": 500, "default": 20 },
+          "parcel_year": { "type": "integer", "minimum": 2020, "description": "Parcel register year; defaults to latest available." },
+          "season_from": { "type": "string", "format": "date" },
+          "season_to": { "type": "string", "format": "date" },
+          "max_cloud_pct": { "type": "number", "minimum": 0, "maximum": 100, "default": 20 },
+          "contents": {
+            "type": "array",
+            "items": { "enum": ["ortho", "ortho_cir", "dem", "satellite_series", "parcels", "soil", "water", "nature", "forest", "weather"] },
+            "uniqueItems": true,
+            "description": "Defaults to all."
+          },
+          "output_visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "request_product",
+      "description": "Request a derived product from catalog assets. Not available in the MVP: the job is recorded with status 'unavailable' and returned.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["product_type", "input_asset_ids"],
+        "properties": {
+          "product_type": { "enum": ["orthomosaic", "gaussian_splat_3d", "super_resolution", "dem", "index_map"] },
+          "input_asset_ids": { "type": "array", "items": { "$ref": "#/$defs/id" }, "minItems": 1 },
+          "aoi": { "$ref": "#/$defs/geometry" },
+          "parameters": { "type": "object", "description": "Recipe-specific parameters." },
+          "output_visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_job_status",
+      "description": "Get the status of a product job.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["job_id"],
+        "properties": { "job_id": { "$ref": "#/$defs/id" } },
+        "additionalProperties": false
+      }
+    }
+  ]
+}
