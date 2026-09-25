@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Rewrite schema/tools.json in its canonical layout (see ufield_schema.format_json)."""
+
+import json
+import sys
+from collections import OrderedDict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ufield_schema as us  # noqa: E402
+
+doc = json.loads(us.TOOLS_PATH.read_text(encoding="utf-8"), object_pairs_hook=OrderedDict)
+us.TOOLS_PATH.write_text(us.format_json(doc), encoding="utf-8")

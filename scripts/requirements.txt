@@ -1,0 +1,3 @@
+# Tools for scripts/validate_schema (development and CI only; not shipped in the app)
+jsonschema>=4.18
+PyYAML>=6.0

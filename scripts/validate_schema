@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Check schema/tools.json, config/layers.yaml and schema/tests/cases.json.
+
+Usage: scripts/validate_schema            (exit 1 on any problem)
+Needs: pip install -r scripts/requirements.txt
+"""
+
+from __future__ import annotations
+
+import sys
+
+import yaml
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
+
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
+import ufield_schema as us  # noqa: E402
+
+# Registry layer types that add_layer can add to a project; the rest are
+# server-side services that only products use.
+NON_LAYER_TYPES = {"ogcapi_processes", "openeo"}
+
+problems: list[str] = []
+
+
+def fail(msg: str) -> None:
+    problems.append(msg)
+
+
+def check_tools(doc: dict) -> dict:
+    exported = {}
+    names = [t["name"] for t in doc["tools"]]
+    for dup in {n for n in names if names.count(n) > 1}:
+        fail(f"duplicate tool name: {dup}")
+
+    all_refs = set()
+    for tool in doc["tools"]:
+        name, schema = tool["name"], tool["inputSchema"]
+        where = f"tool {name}"
+        all_refs |= us.used_refs(schema)
+        if schema.get("type") != "object":
+            fail(f"{where}: inputSchema.type must be 'object'")
+        if schema.get("additionalProperties") is not False:
+            fail(f"{where}: inputSchema must set additionalProperties: false")
+        for key in us.FORBIDDEN_TOP_LEVEL:
+            if key in schema:
+                fail(f"{where}: top-level '{key}' is not allowed; use x-ufield-rules")
+        props = set(schema.get("properties", {}))
+        for req in schema.get("required", []):
+            if req not in props:
+                fail(f"{where}: required '{req}' is not a property")
+        rules = schema.get("x-ufield-rules", {})
+        for kind in rules:
+            if kind not in us.RULE_KINDS:
+                fail(f"{where}: unknown rule kind '{kind}'")
+        for prop in us.rule_properties(rules) - props:
+            fail(f"{where}: rule names unknown property '{prop}'")
+        try:
+            out = us.export_tool(doc, tool)
+        except (KeyError, ValueError) as e:
+            fail(f"{where}: export failed: {e}")
+            continue
+        text = str(out)
+        if "$ref" in text or "'x-" in text:
+            fail(f"{where}: exported schema still has $ref or x- keys")
+        try:
+            Draft202012Validator.check_schema(out["inputSchema"])
+        except SchemaError as e:
+            fail(f"{where}: exported schema invalid: {e.message}")
+            continue
+        exported[name] = out
+
+    for d in doc.get("$defs", {}):
+        if f"#/$defs/{d}" not in all_refs and not any(
+            r.startswith(f"#/$defs/{d}/") for r in all_refs
+        ):
+            fail(f"$defs/{d} is never used")
+    return exported
+
+
+def check_cases(doc: dict, exported: dict, cases: dict) -> int:
+    by_name = {t["name"]: t for t in doc["tools"]}
+    count = 0
+    for name in by_name:
+        if not cases.get(name, {}).get("valid") or not cases.get(name, {}).get("invalid"):
+            fail(f"tool {name}: needs at least one valid and one invalid test case")
+    for name, sets in cases.items():
+        if name not in exported:
+            if name not in by_name:
+                fail(f"test cases for unknown tool '{name}'")
+            continue
+        validator = Draft202012Validator(exported[name]["inputSchema"])
+        raw = by_name[name]["inputSchema"]
+        for expect in ("valid", "invalid"):
+            for i, inst in enumerate(sets.get(expect, [])):
+                count += 1
+                errs = [e.message for e in validator.iter_errors(inst)]
+                errs += us.check_rules(raw, inst)
+                if expect == "valid" and errs:
+                    fail(f"tool {name}: valid case {i} rejected: {errs[0]}")
+                if expect == "invalid" and not errs:
+                    fail(f"tool {name}: invalid case {i} accepted: {inst}")
+    return count
+
+
+def check_layers(doc: dict, reg: dict) -> None:
+    tools = {t["name"]: t["inputSchema"] for t in doc["tools"]}
+    contents = set(tools["request_farm_pack"]["properties"]["contents"]["items"]["enum"])
+    service_types = set(tools["add_layer"]["properties"]["service_type"]["enum"])
+    auth_ids = set(reg.get("auth", {}))
+    providers = set(reg.get("providers", {}))
+
+    ids = [layer["id"] for layer in reg["layers"]]
+    for dup in {i for i in ids if ids.count(i) > 1}:
+        fail(f"layers.yaml: duplicate layer id {dup}")
+    supplied = set()
+    for layer in reg["layers"]:
+        where = f"layers.yaml {layer['id']}"
+        if layer.get("provider") not in providers:
+            fail(f"{where}: unknown provider {layer.get('provider')}")
+        auth = layer.get("auth")
+        if auth != "none" and auth not in auth_ids:
+            fail(f"{where}: auth '{auth}' is not defined in the auth section")
+        ltype = layer.get("type")
+        if ltype not in NON_LAYER_TYPES and ltype not in service_types:
+            fail(f"{where}: type '{ltype}' is not an add_layer service_type")
+        roles = layer.get("farm_pack")
+        if roles is not None:
+            if not isinstance(roles, list):
+                fail(f"{where}: farm_pack must be a list or null")
+                continue
+            for role in roles:
+                if role not in contents:
+                    fail(f"{where}: farm_pack '{role}' is not a request_farm_pack content")
+            supplied |= set(roles)
+    for missing in sorted(contents - supplied):
+        fail(f"request_farm_pack content '{missing}' has no layer in layers.yaml")
+
+
+def check_format() -> None:
+    text = us.TOOLS_PATH.read_text(encoding="utf-8")
+    doc = __import__("json").loads(text, object_pairs_hook=__import__("collections").OrderedDict)
+    if text != us.format_json(doc):
+        fail("schema/tools.json is not in canonical layout: run scripts/format_schema")
+
+
+def main() -> int:
+    check_format()
+    doc = us.load_tools()
+    exported = check_tools(doc)
+    with open(us.CASES_PATH, encoding="utf-8") as f:
+        cases = __import__("json").load(f)
+    n = check_cases(doc, exported, cases)
+    with open(us.LAYERS_PATH, encoding="utf-8") as f:
+        check_layers(doc, yaml.safe_load(f))
+    if problems:
+        print("\n".join(problems), file=sys.stderr)
+        print(f"\n{len(problems)} problem(s)", file=sys.stderr)
+        return 1
+    print(f"OK: {len(exported)} tools exported standalone, {n} test cases, layer registry consistent")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

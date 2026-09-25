@@ -4,10 +4,8 @@
   "title": "μField tool schema",
   "description": "Single source of truth for every μField action. Used by the app UI (ToolDispatcher), the MCP server and the voice agent. Each entry maps directly to an MCP tool (name, description, inputSchema).",
   "version": "0.1.0",
-
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,64}$" },
-
     "position": {
       "type": "object",
       "description": "GNSS position as captured by the device.",
@@ -24,7 +22,6 @@
       },
       "additionalProperties": false
     },
-
     "orientation": {
       "type": "object",
       "description": "Device orientation at capture, degrees.",
@@ -35,7 +32,6 @@
       },
       "additionalProperties": false
     },
-
     "geometry": {
       "type": "object",
       "description": "GeoJSON geometry in EPSG:4326.",
@@ -45,90 +41,65 @@
         "coordinates": { "type": "array" }
       }
     },
-
     "visibility": { "enum": ["proprietary", "public"] },
-
     "auth_config_id": {
       "type": "string",
       "pattern": "^[a-z0-9]{7}$",
       "description": "Id of a credential stored in the QGIS auth manager on the device. The secret itself is never passed to or returned by any tool."
     },
-
     "credential_free_url": {
       "type": "string",
       "format": "uri",
       "description": "Service URL without credentials. URLs with user:password@ or a key/token query parameter are rejected; add the credential in settings and pass auth_config_id. ToolDispatcher repeats this check case-insensitively.",
-      "not": { "pattern": "^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*@|[?&]([Aa][Pp][Ii][-_]?[Kk][Ee][Yy]|[Kk][Ee][Yy]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Cc][Cc][Ee][Ss][Ss][-_]?[Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ii][Gg])=" }
+      "not": {
+        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*@|[?&]([Aa][Pp][Ii][-_]?[Kk][Ee][Yy]|[Kk][Ee][Yy]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Cc][Cc][Ee][Ss][Ss][-_]?[Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ii][Gg])="
+      }
     },
-
     "feature_uuid": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
       "description": "Stable feature id (the ufield_uuid field, lowercase UUID). Unlike QGIS fids it survives sync, edits and layer changes; notes are stored under it."
     },
-
     "time_range": {
       "type": "object",
-      "properties": {
-        "from": { "type": "string", "format": "date-time" },
-        "to": { "type": "string", "format": "date-time" }
-      },
+      "properties": { "from": { "type": "string", "format": "date-time" }, "to": { "type": "string", "format": "date-time" } },
       "additionalProperties": false
     },
-
     "field_parcel_id": {
       "type": "string",
       "pattern": "^[0-9]{10}$",
       "description": "Ruokavirasto peltolohkotunnus (field parcel id), 10 digits, e.g. '0350123456'."
     },
-
     "property_id": {
       "type": "string",
       "pattern": "^([0-9]{1,3}-[0-9]{1,3}-[0-9]{1,4}-[0-9]{1,4}|[0-9]{14})$",
       "description": "MML kiinteistötunnus (property id), either dashed '91-403-1-123' / '091-403-0001-0123' or the 14-digit long form '09140300010123'. Normalised to the long form. Määräalat (unseparated parcels, '-M' suffix) are not supported."
     },
-
     "area_class": {
       "enum": ["field", "forest", "other_green", "brownfield", "urban_green", "unclassified"],
       "description": "Kind of land in a target area part: field (pelto), forest (metsä), other_green (muu viheralue: meadow, pasture, wetland), brownfield (ruskea alue: former industrial, contaminated or extraction land), urban_green (kaupunkivihreä: parks, yards, street green), unclassified."
     },
-
     "attributes": {
       "type": "object",
       "description": "Feature attributes as field name → value. Must match the target layer's fields.",
       "additionalProperties": { "type": ["string", "number", "integer", "boolean", "null"] }
     },
-
-    "bbox": {
-      "type": "array",
-      "description": "[minLon, minLat, maxLon, maxLat] in EPSG:4326.",
-      "items": { "type": "number" },
-      "minItems": 4,
-      "maxItems": 4
-    }
+    "bbox": { "type": "array", "description": "[minLon, minLat, maxLon, maxLat] in EPSG:4326.", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 }
   },
-
   "tools": [
     {
       "name": "list_projects",
       "description": "List μField/QGIS projects available in the user's connected storage.",
       "inputSchema": {
         "type": "object",
-        "properties": {
-          "storage": { "enum": ["local", "google_drive", "onedrive", "mergin_ce", "all"], "default": "all" }
-        },
+        "properties": { "storage": { "enum": ["local", "google_drive", "onedrive", "mergin_ce", "all"], "default": "all" } },
         "additionalProperties": false
       }
     },
     {
       "name": "open_project",
       "description": "Open a project so later tools act on it. Returns its layers and editable fields.",
-      "inputSchema": {
-        "type": "object",
-        "required": ["project_id"],
-        "properties": { "project_id": { "$ref": "#/$defs/id" } },
-        "additionalProperties": false
-      }
+      "inputSchema": { "type": "object", "required": ["project_id"], "properties": { "project_id": { "$ref": "#/$defs/id" } }, "additionalProperties": false }
     },
     {
       "name": "get_location",
@@ -159,10 +130,7 @@
       "description": "Add a layer to the open project, either from the registry by id or from a service URL. For a service that needs a login or key, the user first adds the credential in settings (never through a tool); pass its auth_config_id. URLs containing credentials are rejected.",
       "inputSchema": {
         "type": "object",
-        "oneOf": [
-          { "required": ["registry_id"] },
-          { "required": ["url", "service_type"] }
-        ],
+        "oneOf": [{ "required": ["registry_id"] }, { "required": ["url", "service_type"] }],
         "properties": {
           "registry_id": { "$ref": "#/$defs/id" },
           "url": { "$ref": "#/$defs/credential_free_url" },
@@ -179,9 +147,7 @@
       "description": "List credentials the user has stored on this device for map services: id, name, method and host only. Secrets are never returned. Credentials are added and edited only in the app's settings screen.",
       "inputSchema": {
         "type": "object",
-        "properties": {
-          "host": { "type": "string", "description": "Only credentials for this host, e.g. 'example.org'." }
-        },
+        "properties": { "host": { "type": "string", "description": "Only credentials for this host, e.g. 'example.org'." } },
         "additionalProperties": false
       }
     },
@@ -191,10 +157,7 @@
       "inputSchema": {
         "type": "object",
         "required": ["auth_config_id", "confirm"],
-        "properties": {
-          "auth_config_id": { "$ref": "#/$defs/auth_config_id" },
-          "confirm": { "const": true }
-        },
+        "properties": { "auth_config_id": { "$ref": "#/$defs/auth_config_id" }, "confirm": { "const": true } },
         "additionalProperties": false
       }
     },
@@ -243,11 +206,7 @@
           "near": {
             "type": "object",
             "required": ["lat", "lon", "radius_m"],
-            "properties": {
-              "lat": { "type": "number" },
-              "lon": { "type": "number" },
-              "radius_m": { "type": "number", "minimum": 0 }
-            }
+            "properties": { "lat": { "type": "number" }, "lon": { "type": "number" }, "radius_m": { "type": "number", "minimum": 0 } }
           },
           "time_from": { "type": "string", "format": "date-time" },
           "time_to": { "type": "string", "format": "date-time" },
@@ -263,11 +222,7 @@
       "inputSchema": {
         "type": "object",
         "required": ["feature_id"],
-        "properties": {
-          "feature_id": { "$ref": "#/$defs/id" },
-          "attributes": { "$ref": "#/$defs/attributes" },
-          "geometry": { "$ref": "#/$defs/geometry" }
-        },
+        "properties": { "feature_id": { "$ref": "#/$defs/id" }, "attributes": { "$ref": "#/$defs/attributes" }, "geometry": { "$ref": "#/$defs/geometry" } },
         "additionalProperties": false
       }
     },
@@ -277,10 +232,7 @@
       "inputSchema": {
         "type": "object",
         "required": ["feature_id", "confirm"],
-        "properties": {
-          "feature_id": { "$ref": "#/$defs/id" },
-          "confirm": { "const": true }
-        },
+        "properties": { "feature_id": { "$ref": "#/$defs/id" }, "confirm": { "const": true } },
         "additionalProperties": false
       }
     },
@@ -290,7 +242,13 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "feature_uuids": { "type": "array", "items": { "$ref": "#/$defs/feature_uuid" }, "minItems": 1, "maxItems": 1000, "description": "Omit to read project-level analyses." },
+          "feature_uuids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/feature_uuid" },
+            "minItems": 1,
+            "maxItems": 1000,
+            "description": "Omit to read project-level analyses."
+          },
           "author": { "enum": ["given", "ai", "all"], "default": "all" },
           "kind": { "enum": ["observation", "analysis", "summary", "question"] },
           "transcription": { "enum": ["pending", "done", "failed"], "description": "Only voice notes with this transcription status." },
@@ -342,10 +300,7 @@
             "items": {
               "type": "object",
               "required": ["lat", "lon"],
-              "properties": {
-                "lat": { "type": "number", "minimum": -90, "maximum": 90 },
-                "lon": { "type": "number", "minimum": -180, "maximum": 180 }
-              },
+              "properties": { "lat": { "type": "number", "minimum": -90, "maximum": 90 }, "lon": { "type": "number", "minimum": -180, "maximum": 180 } },
               "additionalProperties": false
             },
             "minItems": 1,
@@ -416,7 +371,14 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "feature_uuids": { "type": "array", "items": { "$ref": "#/$defs/feature_uuid" }, "minItems": 1, "maxItems": 100, "uniqueItems": true, "description": "Omit for a project-level note." },
+          "feature_uuids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/feature_uuid" },
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "description": "Omit for a project-level note."
+          },
           "source": { "enum": ["capture", "existing_file"], "default": "capture" },
           "file_ref": { "type": "string", "description": "Path or storage URI of the recording when source is existing_file." },
           "title": { "type": "string", "maxLength": 200, "description": "Optional; defaults to the first words of the transcript." },
@@ -432,8 +394,15 @@
         "type": "object",
         "properties": {
           "language": { "enum": ["fi", "en", "sv", "auto"] },
-          "mode": { "enum": ["notes_only", "agent"], "description": "notes_only: speech becomes given notes with no AI model involved. agent: spoken commands also go to Claude, which calls tools." },
-          "transcribe_on": { "enum": ["any_network", "wifi_only"], "default": "any_network", "description": "When queued recordings are uploaded for transcription." }
+          "mode": {
+            "enum": ["notes_only", "agent"],
+            "description": "notes_only: speech becomes given notes with no AI model involved. agent: spoken commands also go to Claude, which calls tools."
+          },
+          "transcribe_on": {
+            "enum": ["any_network", "wifi_only"],
+            "default": "any_network",
+            "description": "When queued recordings are uploaded for transcription."
+          }
         },
         "additionalProperties": false
       }
@@ -441,13 +410,7 @@
     {
       "name": "sync_project",
       "description": "Synchronise the open project with its storage provider. Returns changed items and any conflicts.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "direction": { "enum": ["both", "push", "pull"], "default": "both" }
-        },
-        "additionalProperties": false
-      }
+      "inputSchema": { "type": "object", "properties": { "direction": { "enum": ["both", "push", "pull"], "default": "both" } }, "additionalProperties": false }
     },
     {
       "name": "search_catalog",
@@ -473,39 +436,35 @@
         "properties": {
           "target_area_id": { "$ref": "#/$defs/id", "description": "Area to edit. Omit to create a new area." },
           "name": { "type": "string", "minLength": 1, "maxLength": 120, "description": "Display name, e.g. 'Kotitila' or 'Puistoalue 3'." },
-          "field_parcel_ids": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/field_parcel_id" },
-            "minItems": 1,
-            "maxItems": 500,
-            "uniqueItems": true
-          },
-          "property_ids": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/property_id" },
-            "minItems": 1,
-            "maxItems": 200,
-            "uniqueItems": true
-          },
+          "field_parcel_ids": { "type": "array", "items": { "$ref": "#/$defs/field_parcel_id" }, "minItems": 1, "maxItems": 500, "uniqueItems": true },
+          "property_ids": { "type": "array", "items": { "$ref": "#/$defs/property_id" }, "minItems": 1, "maxItems": 200, "uniqueItems": true },
           "pick_at": {
             "type": "array",
             "description": "Map points (EPSG:4326); the field parcel or property under each point is selected. Used by map taps.",
             "items": {
               "type": "object",
               "required": ["lat", "lon"],
-              "properties": {
-                "lat": { "type": "number", "minimum": -90, "maximum": 90 },
-                "lon": { "type": "number", "minimum": -180, "maximum": 180 }
-              },
+              "properties": { "lat": { "type": "number", "minimum": -90, "maximum": 90 }, "lon": { "type": "number", "minimum": -180, "maximum": 180 } },
               "additionalProperties": false
             },
             "minItems": 1,
             "maxItems": 100
           },
           "pick_layer": { "enum": ["field_parcel", "property"], "default": "field_parcel", "description": "What pick_at selects." },
-          "area_class": { "$ref": "#/$defs/area_class", "description": "Class for the parts added in this call. Defaults to 'field' for field parcels and 'unclassified' for properties." },
-          "mode": { "enum": ["add", "remove", "replace"], "default": "add", "description": "How the given parts change an existing area. Ignored when creating." },
-          "field_parcel_year": { "type": "integer", "minimum": 2020, "description": "Parcel register year used to resolve peltolohkotunnus; defaults to the latest available." },
+          "area_class": {
+            "$ref": "#/$defs/area_class",
+            "description": "Class for the parts added in this call. Defaults to 'field' for field parcels and 'unclassified' for properties."
+          },
+          "mode": {
+            "enum": ["add", "remove", "replace"],
+            "default": "add",
+            "description": "How the given parts change an existing area. Ignored when creating."
+          },
+          "field_parcel_year": {
+            "type": "integer",
+            "minimum": 2020,
+            "description": "Parcel register year used to resolve peltolohkotunnus; defaults to the latest available."
+          },
           "visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
         },
         "additionalProperties": false
@@ -530,10 +489,7 @@
       "inputSchema": {
         "type": "object",
         "required": ["target_area_id", "confirm"],
-        "properties": {
-          "target_area_id": { "$ref": "#/$defs/id" },
-          "confirm": { "const": true }
-        },
+        "properties": { "target_area_id": { "$ref": "#/$defs/id" }, "confirm": { "const": true } },
         "additionalProperties": false
       }
     },
@@ -542,15 +498,16 @@
       "description": "Build a Farm Pack for one target area (fields, forest, other green, brownfield or urban green land): orthophotos, elevation, a Sentinel-2 season series and clipped open vector layers, packaged as GeoPackage + COGs + STAC. Give target_area_id (see select_target_area) or a drawn aoi. Runs on the server; returns a job to poll with get_job_status. Available in the MVP.",
       "inputSchema": {
         "type": "object",
-        "oneOf": [
-          { "required": ["target_area_id"] },
-          { "required": ["aoi"] }
-        ],
+        "oneOf": [{ "required": ["target_area_id"] }, { "required": ["aoi"] }],
         "properties": {
           "target_area_id": { "$ref": "#/$defs/id", "description": "Target area from select_target_area; the pack AOI is the union of its parts." },
           "aoi": { "$ref": "#/$defs/geometry", "description": "Drawn boundary, when no target area is used." },
           "buffer_m": { "type": "number", "minimum": 0, "maximum": 500, "default": 20 },
-          "parcel_year": { "type": "integer", "minimum": 2020, "description": "Parcel register year for the parcels content; defaults to the target area's field_parcel_year, else the latest available." },
+          "parcel_year": {
+            "type": "integer",
+            "minimum": 2020,
+            "description": "Parcel register year for the parcels content; defaults to the target area's field_parcel_year, else the latest available."
+          },
           "season_from": { "type": "string", "format": "date" },
           "season_to": { "type": "string", "format": "date" },
           "max_cloud_pct": { "type": "number", "minimum": 0, "maximum": 100, "default": 20 },
@@ -585,12 +542,7 @@
     {
       "name": "get_job_status",
       "description": "Get the status of a product job.",
-      "inputSchema": {
-        "type": "object",
-        "required": ["job_id"],
-        "properties": { "job_id": { "$ref": "#/$defs/id" } },
-        "additionalProperties": false
-      }
+      "inputSchema": { "type": "object", "required": ["job_id"], "properties": { "job_id": { "$ref": "#/$defs/id" } }, "additionalProperties": false }
     }
   ]
 }
