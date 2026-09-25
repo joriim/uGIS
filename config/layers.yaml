@@ -1,0 +1,384 @@
+# μField layer registry — config/layers.yaml
+# Draft 2026-09-24. See docs/layer-sources.md for sources and caveats.
+#
+# Fields:
+#   id           unique id used by tools (list_layers / add_layer registry_id)
+#   type         wms | wmts | wfs | wcs | ogcapi_features | ogcapi_processes | openeo | vector_tiles
+#   url          service base URL (capabilities are fetched at runtime)
+#   layers       layer / feature type names; {year} is resolved to the latest available year
+#   auth         none | an id from the auth section below (secrets live on ufield-server, never in the app)
+#   via_server   true = the app must go through ufield-server (key hiding, caching, tiling)
+#   farm_pack    role in the Farm Pack product, or null
+#   target_area  field_parcel | property: this layer resolves ids for select_target_area
+#   id_attribute attribute holding the id used by target_area (peltolohkotunnus / kiinteistötunnus)
+#   license / attribution  shown in the app and written into STAC items
+#   verified     date the endpoint was last checked by scripts/check_layers.py
+
+version: 1
+
+# Server-side credentials, see docs/adr/0002-credentials.md.
+#   secret  environment variable ufield-server reads at startup; it refuses to start
+#           if a secret used by an enabled layer is missing. Values never go in this file.
+#   apply   basic_user                = HTTP Basic, secret as user name, empty password
+#           oauth_client_credentials = secret is "client_id:client_secret"; bearer token fetched and refreshed by the server
+#   Never apply a secret as a URL query parameter.
+auth:
+  mml_api_key:
+    secret: UFIELD_MML_API_KEY
+    apply: basic_user
+  cdse_oauth:
+    secret: UFIELD_CDSE_CLIENT
+    apply: oauth_client_credentials     # TODO: confirm CDSE openEO accepts client credentials (ADR 0002 §7)
+    token_url: https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token   # TODO: verify
+
+providers:
+  mml:
+    name: Maanmittauslaitos
+    license: CC-BY-4.0
+    attribution: "© Maanmittauslaitos"
+  ruokavirasto:
+    name: Ruokavirasto
+    license: CC-BY-4.0
+    attribution: "© Ruokavirasto"
+  gtk:
+    name: Geologian tutkimuskeskus (GTK)
+    license: CC-BY-4.0          # open-licence layers only; basic-licence layers excluded
+    attribution: "© Geologian tutkimuskeskus"
+  syke:
+    name: Suomen ympäristökeskus (Syke)
+    license: CC-BY-4.0          # TODO: confirm per dataset
+    attribution: "© Syke"
+  metsakeskus:
+    name: Suomen metsäkeskus
+    license: CC-BY-4.0          # TODO: confirm per product description
+    attribution: "© Suomen metsäkeskus"
+  luke:
+    name: Luonnonvarakeskus (Luke)
+    license: CC-BY-4.0          # TODO: confirm
+    attribution: "© Luonnonvarakeskus"
+  fmi:
+    name: Ilmatieteen laitos
+    license: CC-BY-4.0
+    attribution: "© Ilmatieteen laitos"
+  cdse:
+    name: Copernicus Data Space Ecosystem
+    license: copernicus-open
+    attribution: "Contains modified Copernicus Sentinel data {year}"
+
+layers:
+
+  # ---------- Base maps (MML) ----------
+  - id: mml_taustakartta
+    title: Taustakartta
+    provider: mml
+    category: basemap
+    type: wmts
+    url: https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/WMTSCapabilities.xml
+    layers: [taustakartta]
+    tile_matrix_sets: [ETRS-TM35FIN, WGS84_Pseudo-Mercator]
+    auth: mml_api_key
+    via_server: true
+    farm_pack: null
+
+  - id: mml_maastokartta
+    title: Maastokartta
+    provider: mml
+    category: basemap
+    type: wmts
+    url: https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/WMTSCapabilities.xml
+    layers: [maastokartta]
+    tile_matrix_sets: [ETRS-TM35FIN, WGS84_Pseudo-Mercator]
+    auth: mml_api_key
+    via_server: true
+    farm_pack: null
+
+  - id: mml_ortokuva_wmts
+    title: Ortokuva (näyttö)
+    provider: mml
+    category: imagery
+    type: wmts
+    url: https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/WMTSCapabilities.xml
+    layers: [ortokuva, ortokuva_vaaravari]
+    auth: mml_api_key
+    via_server: true
+    farm_pack: null
+
+  - id: mml_vectortiles
+    title: Vektoritiilet
+    provider: mml
+    category: basemap
+    type: vector_tiles
+    url: https://avoin-karttakuva.maanmittauslaitos.fi/vectortiles/wmts
+    auth: mml_api_key
+    via_server: true
+    farm_pack: null
+
+  # ---------- MML data for the Farm Pack ----------
+  - id: mml_ortho_wcs
+    title: Ortokuvat 0,5 m (väri, vääräväri)
+    provider: mml
+    category: imagery
+    type: wcs
+    url: https://avoin-karttakuva.maanmittauslaitos.fi/ortokuvat-ja-korkeusmallit/wcs/v2
+    coverages: [ortokuva_vari, ortokuva_vaaravari]   # TODO: confirm exact coverage ids from GetCapabilities
+    resolution_m: 0.5
+    max_request: {extent_m: 2000, pixels: 4000}      # tile larger AOIs
+    crs: EPSG:3067
+    auth: mml_api_key
+    via_server: true
+    farm_pack: ortho
+
+  - id: mml_dem2_wcs
+    title: Korkeusmalli 2 m
+    provider: mml
+    category: elevation
+    type: wcs
+    url: https://avoin-karttakuva.maanmittauslaitos.fi/ortokuvat-ja-korkeusmallit/wcs/v2
+    coverages: [korkeusmalli_2m]                     # TODO: confirm exact coverage id
+    resolution_m: 2
+    max_request: {extent_m: 10000, pixels: 5000}
+    crs: EPSG:3067
+    auth: mml_api_key
+    via_server: true
+    farm_pack: dem
+
+  - id: mml_file_service
+    title: Paikkatiedon tiedostopalvelu (laserkeilaus, maastotietokanta)
+    provider: mml
+    category: download
+    type: ogcapi_processes
+    url: https://avoin-paikkatieto.maanmittauslaitos.fi/tiedostopalvelu/ogcproc/v1/   # TODO: verify path
+    crs: EPSG:3067
+    auth: mml_api_key
+    via_server: true
+    farm_pack: null            # later: LiDAR for 3D products
+
+  - id: mml_kiinteistot
+    title: Kiinteistöjaotus (palstat ja kiinteistötunnukset)
+    provider: mml
+    category: cadastre
+    type: ogcapi_features
+    url: https://avoin-paikkatieto.maanmittauslaitos.fi/kiinteisto-avoin/simple-features/v3/   # TODO: verify path
+    layers: []                 # TODO: fill collection id for palstat (property parcels) from /collections
+    id_attribute: null         # TODO: attribute holding kiinteistötunnus; a property can have several palstat
+    crs: EPSG:3067
+    auth: mml_api_key
+    via_server: true
+    farm_pack: null
+    target_area: property
+
+  - id: mml_maastotiedot
+    title: Maastotietokanta (kohteet)
+    provider: mml
+    category: reference
+    type: ogcapi_features
+    url: https://avoin-paikkatieto.maanmittauslaitos.fi/maastotiedot/features/v1/
+    auth: mml_api_key
+    via_server: true
+    farm_pack: null
+
+  # ---------- Ruokavirasto ----------
+  - id: ruokavirasto_peltolohkot
+    title: Peltolohkot
+    provider: ruokavirasto
+    category: agriculture
+    type: wfs
+    url: https://inspire.ruokavirasto-awsa.com/geoserver/wfs
+    layers: ["inspire:LC.LandCoverSurfaces.LPIS.{year}"]
+    years_available: [2020, 2025]
+    crs: EPSG:3067
+    auth: none
+    via_server: false
+    farm_pack: parcels
+    target_area: field_parcel
+    id_attribute: null         # TODO: attribute holding peltolohkotunnus; confirm from DescribeFeatureType
+
+  - id: ruokavirasto_kasvulohkot
+    title: Kasvulohkot
+    provider: ruokavirasto
+    category: agriculture
+    type: wfs
+    url: https://inspire.ruokavirasto-awsa.com/geoserver/wfs
+    layers: ["inspire:LandUse.ExistingLandUse.GSAAAgriculturalParcel.{year}"]
+    years_available: [2020, 2025]
+    crs: EPSG:3067
+    auth: none
+    via_server: false
+    farm_pack: parcels
+
+  - id: ruokavirasto_maisemapiirteet
+    title: Maisemapiirteet
+    provider: ruokavirasto
+    category: agriculture
+    type: wfs
+    url: https://inspire.ruokavirasto-awsa.com/geoserver/wfs
+    layers: ["inspire:LC.LandCoverSurfaces.LPISLandscapeFeature.{year}"]
+    crs: EPSG:3067
+    auth: none
+    via_server: false
+    farm_pack: reference
+
+  - id: ruokavirasto_wms
+    title: Ruokavirasto INSPIRE (näyttö)
+    provider: ruokavirasto
+    category: agriculture
+    type: wms
+    url: https://inspire.ruokavirasto-awsa.com/geoserver/wms
+    auth: none
+    via_server: false
+    farm_pack: null
+
+  # ---------- GTK ----------
+  - id: gtk_maapera
+    title: Maaperä (1:20 000 – 1:1 000 000), happamat sulfaattimaat, turvemaat
+    provider: gtk
+    category: soil
+    type: wms
+    url: https://gtkdata.gtk.fi/arcgis/rest/services/Rajapinnat/GTK_Maapera_WMS/MapServer/WMSServer
+    layers: []                 # TODO: fill exact layer ids from GetCapabilities (open-licence layers only)
+    auth: none
+    via_server: false
+    farm_pack: soil
+
+  # ---------- SYKE ----------
+  - id: syke_valuma_alueet
+    title: Valuma-alueet ja uomaverkosto
+    provider: syke
+    category: water
+    type: wfs
+    url: https://paikkatiedot.ymparisto.fi/geoserver/inspire_hy/wfs
+    auth: none
+    via_server: false
+    farm_pack: reference
+
+  - id: syke_pohjavesialueet
+    title: Pohjavesialueet
+    provider: syke
+    category: water
+    type: wfs
+    url: https://paikkatiedot.ymparisto.fi/geoserver/syke_vhspohjavesi/wfs
+    auth: none
+    via_server: false
+    farm_pack: reference
+
+  - id: syke_tulvat
+    title: Tulvavaara-alueet
+    provider: syke
+    category: water
+    type: wms
+    url: https://paikkatiedot.ymparisto.fi/geoserver/inspire_nz/wms
+    auth: none
+    via_server: false
+    farm_pack: reference
+
+  - id: syke_suojelualueet
+    title: Suojelualueet ja Natura 2000
+    provider: syke
+    category: nature
+    type: wfs
+    url: https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs
+    auth: none
+    via_server: false
+    farm_pack: reference
+
+  - id: syke_corine
+    title: CORINE maanpeite
+    provider: syke
+    category: landcover
+    type: wms
+    url: https://paikkatiedot.ymparisto.fi/geoserver/inspire_lc/wms
+    auth: none
+    via_server: false
+    farm_pack: null
+
+  - id: syke_vemala
+    title: VEMALA ravinnekuormitus
+    provider: syke
+    category: water
+    type: wms
+    url: https://paikkatiedot.ymparisto.fi/geoserver/vemalaAvoin/wms
+    auth: none
+    via_server: false
+    farm_pack: null
+
+  - id: syke_hiilikartta
+    title: Hiilikartta
+    provider: syke
+    category: carbon
+    type: wms
+    url: https://paikkatiedot.ymparisto.fi/geoserver/syke_hiilikartta/wms
+    auth: none
+    via_server: false
+    farm_pack: null
+
+  # ---------- Metsäkeskus ----------
+  - id: metsakeskus_kuviot
+    title: Metsävarakuviot
+    provider: metsakeskus
+    category: forest
+    type: wfs
+    url: https://avoin.metsakeskus.fi/rajapinnat/v2/stand/ows
+    auth: none
+    via_server: false
+    farm_pack: forest
+
+  - id: metsakeskus_elinymparistot
+    title: Erityisen tärkeät elinympäristöt
+    provider: metsakeskus
+    category: nature
+    type: wms
+    url: https://avoin.metsakeskus.fi/rajapinnat/v2/habitat/ows
+    auth: none
+    via_server: false
+    farm_pack: null
+
+  - id: metsakeskus_hila
+    title: Hilatiedot (pintavesi, kosteusindeksi, latvusmalli)
+    provider: metsakeskus
+    category: forest
+    type: wcs
+    url: https://avoin.metsakeskus.fi/rajapinnat/v2/gridcell/ows
+    auth: none
+    via_server: true
+    farm_pack: null
+
+  # ---------- Luke ----------
+  - id: luke_mvmi
+    title: Monilähteinen VMI (MVMI)
+    provider: luke
+    category: forest
+    type: wms
+    url: http://kartta.luke.fi/geoserver/MVMI/wms     # http only per catalogue; TODO: check https
+    auth: none
+    via_server: true
+    farm_pack: null
+
+  # ---------- FMI ----------
+  - id: fmi_opendata
+    title: Säähavainnot ja -ennusteet
+    provider: fmi
+    category: weather
+    type: wfs
+    url: https://opendata.fmi.fi/wfs
+    auth: none
+    via_server: true
+    farm_pack: weather
+
+  # ---------- Satellite (CDSE) ----------
+  - id: cdse_s2_openeo
+    title: Sentinel-2 L2A aikasarja (openEO)
+    provider: cdse
+    category: imagery
+    type: openeo
+    url: https://openeo.dataspace.copernicus.eu
+    collection: SENTINEL2_L2A
+    resolution_m: 10
+    recipe: farm_pack_s2_season     # server/recipes/farm_pack_s2_season.py
+    quota_note: "Free tier per account: 10,000 credits/month, 2 concurrent batch jobs"
+    auth: cdse_oauth
+    via_server: true
+    farm_pack: satellite_series
+
+# Paid / later — kept out of the registry until contracts exist:
+#   planet_agriculture   PlanetScope 3 m daily, 500 ha packages (upgrade path for Farm Pack)
+#   up42                 one-off VHR archive / SAR orders
