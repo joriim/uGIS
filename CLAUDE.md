@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository. Read this fully before
 
 ## What this is
 
-μField is an Android field-data app forked from **Mergin Maps mobile** (GPL-3.0), published on Google Play by Biomitta Oy. Users collect text, numbers, photos and video with location and metadata, work against their own QGIS project, store data in their own storage (local folder, Google Drive, OneDrive), and view open map layers (Ruokavirasto, SYKE, MML, GTK, Luke, Peltoraportti).
+μField is an Android field-data app forked from **Mergin Maps mobile** (GPL-3.0), published on Google Play by Biomitta Oy. Users collect text, numbers, photos and video with location and metadata, work against their own QGIS project, store data in their own storage (local folder, Google Drive, OneDrive), and view open map layers (Ruokavirasto, SYKE, MML, GTK, Luke, Metsäkeskus, FMI).
 
 It is designed **API-first**: every user action is a *tool* defined in `schema/tools.json`. The same tool definitions drive the app UI, the MCP servers (Claude and other MCP clients), and the in-app voice agent, which uses Claude.
 
@@ -80,10 +80,12 @@ docs/                ADRs (docs/adr/NNNN-title.md), play-policy.md, dependencies
 ## Build and test
 
 - Android build follows upstream instructions (see upstream `INSTALL.md` / build docs). Prefer CI builds; local builds need the Qt 6 Android kit, NDK and vcpkg as upstream specifies. Verify commands against upstream docs before running — do not guess.
-- After editing `schema/tools.json`, run `scripts/codegen_tools` to regenerate C++ bindings and server stubs, then `scripts/validate_schema`.
+- After editing `schema/tools.json` or `config/layers.yaml`: run `scripts/format_schema`, then `scripts/validate_schema` (CI runs it too; `pip install -r scripts/requirements.txt`). Once it exists, run `scripts/codegen_tools` to regenerate C++ bindings and server stubs.
+- Tool input schemas never use top-level `oneOf`/`anyOf`/`allOf`/`if` (LLM tool APIs reject them). Put cross-field constraints in the tool's `x-ufield-rules` (`exactly_one_of`, `at_least_one_of`, `at_most_one_of`, `required_if`, see `scripts/ufield_schema.py`); ToolDispatcher enforces them and exported schemas drop them.
+- Features are addressed by `feature_uuid` (the `ufield_uuid` field), never by QGIS fid.
 - Server: `cd server && uv sync && uv run pytest`.
 - MCP smoke test: run the server locally and exercise tools with the MCP Inspector.
-- Every tool needs: a schema test (valid + invalid input), a core unit test, and an MCP round-trip test.
+- Every tool needs: a schema test (valid + invalid input, in `schema/tests/cases.json`), a core unit test, and an MCP round-trip test.
 
 ## Working style
 

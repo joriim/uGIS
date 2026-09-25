@@ -48,13 +48,14 @@ Several of these have lead times of days to weeks, so start them first.
 - [ ] Server hosting in the EU (GDPR) and its secret manager.
 
 **Design fixes from the first review** (all in `schema/tools.json` and `config/layers.yaml`)
-- [ ] One Farm Pack contents vocabulary shared by both files (`ortho_cir`, `water`, `nature`).
-- [ ] Codegen inlines `$defs`; test that every exported tool schema stands alone.
-- [ ] Replace top-level `oneOf` with dispatcher checks (`add_layer`, `request_farm_pack`).
-- [ ] Use `position`/`orientation` in `add_observation` and `attach_media`.
-- [ ] Stable feature ids: a `ufield_uuid` field on every layer; move existing feature tools from `feature_id` to `feature_uuid` (ADR 0003 §2); widen the id pattern for STAC ids.
-- [ ] Align `add_layer.service_type` with registry types.
-- [ ] Fill registry TODOs: layer/collection names, `id_attribute`s, licences marked "confirm". Remove Peltoraportti from `CLAUDE.md` until confirmed.
+- [x] One Farm Pack contents vocabulary shared by both files (`ortho_cir`, `water`, `nature`); checked by `scripts/validate_schema`.
+- [x] Export inlines `$defs` (`scripts/ufield_schema.py`); every exported tool schema is checked to stand alone. Codegen itself comes in phase 2.
+- [x] Replace top-level `oneOf` with dispatcher checks (`x-ufield-rules`), for `add_layer`, `request_farm_pack` and the other tools with either/or inputs.
+- [x] Use `position`/`orientation` in `add_observation` and `attach_media`.
+- [x] Stable feature ids in the schema: feature tools use `feature_uuid` (ADR 0003 §2); `asset_id` allows STAC ids with `.` and `:`. (Adding `ufield_uuid` to layers is app work, phase 2.)
+- [x] Align `add_layer.service_type` with registry types.
+- [ ] Fill registry TODOs: layer/collection names, `id_attribute`s, licences marked "confirm" (needs access to the services' capabilities documents).
+- [x] Remove Peltoraportti from `CLAUDE.md` until confirmed.
 
 **Exit check:** name cleared; Play organisation account and Google Cloud project exist; schema must-fixes merged.
 

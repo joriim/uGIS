@@ -28,7 +28,7 @@ LAYERS_PATH = ROOT / "config" / "layers.yaml"
 CASES_PATH = ROOT / "schema" / "tests" / "cases.json"
 
 RULE_KINDS = ("exactly_one_of", "at_least_one_of", "at_most_one_of", "required_if")
-FORBIDDEN_TOP_LEVEL = ("oneOf", "anyOf", "allOf", "if", "then", "else", "not")
+FORBIDDEN_TOP_LEVEL = ("oneOf", "anyOf", "allOf", "if", "then", "else", "not", "dependentRequired", "dependentSchemas")
 
 
 def load_tools(path: Path = TOOLS_PATH) -> dict:
@@ -41,6 +41,8 @@ def _resolve(doc: dict, ref: str) -> dict:
         raise ValueError(f"only local refs are supported: {ref}")
     node = doc
     for part in ref[2:].split("/"):
+        if not isinstance(node, dict) or part not in node:
+            raise ValueError(f"unresolved $ref: {ref}")
         node = node[part]
     return node
 

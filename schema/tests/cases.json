@@ -1,0 +1,199 @@
+{
+  "list_projects": { "valid": [{}, { "storage": "google_drive" }], "invalid": [{ "storage": "dropbox" }] },
+  "open_project": { "valid": [{ "project_id": "kotitila_2026" }], "invalid": [{}, { "project_id": "bad id!" }] },
+  "get_location": { "valid": [{}, { "min_accuracy_m": 0.05, "timeout_s": 60 }], "invalid": [{ "timeout_s": 0 }, { "timeout_s": 301 }] },
+  "list_layers": { "valid": [{ "source": "registry", "query": "maaperä" }], "invalid": [{ "source": "web" }] },
+  "add_layer": {
+    "valid": [
+      { "registry_id": "gtk_maapera" },
+      { "url": "https://example.org/wms", "service_type": "wms" },
+      { "url": "https://example.org/wms", "service_type": "wms", "auth_config_id": "ab12cd3" },
+      { "url": "https://example.org/f", "service_type": "ogcapi_features" },
+      { "url": "https://example.org/c.tif", "service_type": "wcs", "layer_name": "dem" }
+    ],
+    "invalid": [
+      {},
+      { "registry_id": "gtk_maapera", "url": "https://example.org/wms", "service_type": "wms" },
+      { "url": "https://example.org/wms" },
+      { "registry_id": "gtk_maapera", "auth_config_id": "ab12cd3" },
+      { "url": "https://x.org/wms?api-key=abc", "service_type": "wms" },
+      { "url": "https://user:pw@x.org/wms", "service_type": "wms" },
+      { "url": "https://x.org/p", "service_type": "openeo" },
+      { "auth_config_id": "ab12cd3" }
+    ]
+  },
+  "list_credentials": { "valid": [{}, { "host": "example.org" }], "invalid": [{ "secret": "x" }] },
+  "delete_credential": {
+    "valid": [{ "auth_config_id": "ab12cd3", "confirm": true }],
+    "invalid": [{ "auth_config_id": "ab12cd3" }, { "auth_config_id": "ab12cd3", "confirm": false }]
+  },
+  "add_observation": {
+    "valid": [
+      { "layer_id": "naytteet", "attributes": { "ph": 5.8, "note": "savi" } },
+      {
+        "layer_id": "naytteet",
+        "attributes": {},
+        "use_current_location": false,
+        "geometry": { "type": "Point", "coordinates": [24.9, 60.2] },
+        "position": { "lat": 60.2, "lon": 24.9, "h_accuracy_m": 0.02, "fix_type": "rtk_fixed", "satellites": 21 }
+      }
+    ],
+    "invalid": [
+      { "layer_id": "naytteet" },
+      { "layer_id": "naytteet", "attributes": {}, "position": { "lat": 95, "lon": 0 } },
+      { "layer_id": "naytteet", "attributes": {}, "position": { "lat": 60, "lon": 25, "fix_type": "rtk" } }
+    ]
+  },
+  "attach_media": {
+    "valid": [
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "media_type": "photo" },
+      {
+        "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d",
+        "media_type": "video",
+        "source": "existing_file",
+        "file_ref": "media/v.mp4",
+        "position": { "lat": 60.2, "lon": 24.9, "h_accuracy_m": 0.02, "fix_type": "rtk_fixed", "satellites": 21 },
+        "orientation": { "azimuth": 270, "pitch": -10, "roll": 0 }
+      }
+    ],
+    "invalid": [
+      { "feature_id": "12", "media_type": "photo" },
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "media_type": "photo", "source": "existing_file" },
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "media_type": "photo", "orientation": { "azimuth": 400 } }
+    ]
+  },
+  "query_features": {
+    "valid": [{}, { "layer_id": "naytteet", "near": { "lat": 60.2, "lon": 24.9, "radius_m": 50 }, "filter": "ph < 6", "limit": 10 }],
+    "invalid": [{ "limit": 0 }, { "bbox": [1, 2, 3] }]
+  },
+  "update_feature": {
+    "valid": [
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "attributes": { "ph": 6.1 } },
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "geometry": { "type": "Point", "coordinates": [24.9, 60.2] } }
+    ],
+    "invalid": [
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d" },
+      { "feature_id": "12", "attributes": {} },
+      { "feature_uuid": "12", "attributes": {} }
+    ]
+  },
+  "delete_feature": {
+    "valid": [{ "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "confirm": true }],
+    "invalid": [{ "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d" }, { "feature_id": "12", "confirm": true }]
+  },
+  "read_notes": {
+    "valid": [{}, { "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"], "author": "given", "transcription": "pending" }],
+    "invalid": [{ "author": "human" }, { "feature_uuids": [] }]
+  },
+  "write_note": {
+    "valid": [
+      {
+        "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"],
+        "title": "Maaperä",
+        "body_markdown": "## Summary\nSavi.",
+        "sources": { "layers": ["gtk_maapera"], "assets": ["stac:item.2026-09-25"] }
+      },
+      { "title": "pH-trendi", "body_markdown": "...", "kind": "summary" }
+    ],
+    "invalid": [
+      { "title": "t", "body_markdown": "b", "author": "given" },
+      { "title": "t" },
+      { "title": "t", "body_markdown": "b", "sources": { "assets": ["-bad"] } }
+    ]
+  },
+  "sample_layers": {
+    "valid": [
+      { "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"], "layers": ["gtk_maapera", "syke_tulvat"], "buffer_m": 50 },
+      { "points": [{ "lat": 60.2, "lon": 24.9 }], "layers": ["syke_tulvat"] }
+    ],
+    "invalid": [
+      { "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"] },
+      { "layers": ["gtk_maapera"] },
+      { "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"], "points": [{ "lat": 60.2, "lon": 24.9 }], "layers": ["gtk_maapera"] }
+    ]
+  },
+  "compare_features": {
+    "valid": [
+      {
+        "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "0b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"],
+        "analyses": ["distance_matrix", "attribute_stats"],
+        "attributes": ["ph"]
+      }
+    ],
+    "invalid": [
+      { "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"], "analyses": ["clusters"] },
+      { "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "0b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"], "analyses": [] }
+    ]
+  },
+  "get_time_series": {
+    "valid": [
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "sources": ["feature_history", "satellite_ndvi"], "interval": "month" },
+      { "location": { "lat": 61, "lon": 25, "radius_m": 100 }, "sources": ["nearby_observations"] }
+    ],
+    "invalid": [
+      { "sources": ["weather"] },
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "location": { "lat": 61, "lon": 25, "radius_m": 100 }, "sources": ["weather"] },
+      { "feature_uuid": "9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d", "sources": [] }
+    ]
+  },
+  "add_voice_note": {
+    "valid": [{}, { "feature_uuids": ["9b1c2d3e-4f50-4a6b-8c7d-0e1f2a3b4c5d"], "language": "fi" }, { "source": "existing_file", "file_ref": "media/a.m4a" }],
+    "invalid": [{ "source": "existing_file" }, { "language": "de" }, { "text": "x" }]
+  },
+  "set_voice_settings": {
+    "valid": [{ "mode": "notes_only", "transcribe_on": "wifi_only", "language": "fi" }],
+    "invalid": [{ "stt_engine": "on_device" }, { "mode": "dictation_only" }]
+  },
+  "sync_project": { "valid": [{}, { "direction": "pull" }], "invalid": [{ "direction": "sideways" }] },
+  "search_catalog": { "valid": [{ "asset_kind": "product", "visibility": "public", "limit": 10 }], "invalid": [{ "limit": 501 }, { "asset_kind": "note!" }] },
+  "select_target_area": {
+    "valid": [
+      { "field_parcel_ids": ["0350123456"], "name": "Kotitila" },
+      { "property_ids": ["91-403-1-123", "09140300010123"], "area_class": "urban_green" },
+      { "pick_at": [{ "lat": 60.2, "lon": 24.9 }], "pick_layer": "property", "area_class": "brownfield" },
+      { "target_area_id": "a1", "mode": "remove", "field_parcel_ids": ["0350123456"] },
+      { "target_area_id": "a1", "name": "Kotitila (uusi nimi)" }
+    ],
+    "invalid": [
+      {},
+      { "name": "Kotitila" },
+      { "field_parcel_ids": ["035012345"] },
+      { "property_ids": ["091-403-0001-0123-M0601"] },
+      { "field_parcel_ids": ["0350123456"], "area_class": "desert" }
+    ]
+  },
+  "list_target_areas": { "valid": [{}, { "area_class": "forest", "query": "Koti" }], "invalid": [{ "area_class": "desert" }] },
+  "delete_target_area": { "valid": [{ "target_area_id": "a1", "confirm": true }], "invalid": [{ "target_area_id": "a1" }] },
+  "request_farm_pack": {
+    "valid": [
+      { "target_area_id": "a1" },
+      {
+        "aoi": { "type": "Polygon", "coordinates": [[[24.9, 60.2], [24.95, 60.2], [24.95, 60.22], [24.9, 60.2]]] },
+        "contents": ["ortho", "ortho_cir", "water", "nature"],
+        "max_cloud_pct": 10
+      }
+    ],
+    "invalid": [
+      {},
+      { "target_area_id": "a1", "aoi": { "type": "Polygon", "coordinates": [[[24.9, 60.2], [24.95, 60.2], [24.95, 60.22], [24.9, 60.2]]] } },
+      { "parcel_ids": ["x"] },
+      { "target_area_id": "a1", "contents": ["reference"] }
+    ]
+  },
+  "request_product": {
+    "valid": [
+      { "product_type": "orthomosaic", "input_asset_ids": ["capture:2026-09-25T10:15:00Z.jpg"] },
+      { "product_type": "index_map", "input_asset_ids": ["a1"], "target_area_id": "t1" }
+    ],
+    "invalid": [
+      { "product_type": "orthomosaic", "input_asset_ids": [] },
+      {
+        "product_type": "dem",
+        "input_asset_ids": ["a1"],
+        "aoi": { "type": "Polygon", "coordinates": [[[24.9, 60.2], [24.95, 60.2], [24.95, 60.22], [24.9, 60.2]]] },
+        "target_area_id": "t1"
+      }
+    ]
+  },
+  "get_job_status": { "valid": [{ "job_id": "job_123" }], "invalid": [{}] }
+}

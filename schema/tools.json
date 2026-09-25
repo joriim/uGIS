@@ -6,6 +6,11 @@
   "version": "0.1.0",
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,64}$" },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "description": "STAC item id of a catalog asset (capture, layer, note, product)."
+    },
     "position": {
       "type": "object",
       "description": "GNSS position as captured by the device.",
@@ -130,16 +135,16 @@
       "description": "Add a layer to the open project, either from the registry by id or from a service URL. For a service that needs a login or key, the user first adds the credential in settings (never through a tool); pass its auth_config_id. URLs containing credentials are rejected.",
       "inputSchema": {
         "type": "object",
-        "oneOf": [{ "required": ["registry_id"] }, { "required": ["url", "service_type"] }],
         "properties": {
           "registry_id": { "$ref": "#/$defs/id" },
           "url": { "$ref": "#/$defs/credential_free_url" },
-          "service_type": { "enum": ["wms", "wmts", "wfs", "xyz", "cog", "geopackage"] },
+          "service_type": { "enum": ["wms", "wmts", "wfs", "wcs", "ogcapi_features", "vector_tiles", "xyz", "cog", "geopackage"] },
           "auth_config_id": { "$ref": "#/$defs/auth_config_id", "description": "Stored credential to use with url (see list_credentials)." },
           "layer_name": { "type": "string" },
           "visible": { "type": "boolean", "default": true }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "x-ufield-rules": { "exactly_one_of": [["registry_id"], ["url", "service_type"]], "at_most_one_of": [["registry_id"], ["auth_config_id"]] }
       }
     },
     {
@@ -163,15 +168,19 @@
     },
     {
       "name": "add_observation",
-      "description": "Record a new feature (observation) in a layer of the open project. Location defaults to the current device position.",
+      "description": "Record a new feature (observation) in a layer of the open project. Location defaults to the current device position, stored with its full GNSS fix. Returns the new feature's ufield_uuid.",
       "inputSchema": {
         "type": "object",
         "required": ["layer_id", "attributes"],
         "properties": {
           "layer_id": { "$ref": "#/$defs/id" },
           "attributes": { "$ref": "#/$defs/attributes" },
-          "geometry": { "$ref": "#/$defs/geometry" },
+          "geometry": { "$ref": "#/$defs/geometry", "description": "Explicit geometry (EPSG:4326). When given, use_current_location is ignored." },
           "use_current_location": { "type": "boolean", "default": true },
+          "position": {
+            "$ref": "#/$defs/position",
+            "description": "GNSS fix for the observation. With use_current_location the app records it from the device; give it when importing an observation recorded elsewhere."
+          },
           "note": { "type": "string", "description": "Free-text note, e.g. transcribed voice input." },
           "visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
         },
@@ -180,24 +189,33 @@
     },
     {
       "name": "attach_media",
-      "description": "Capture or attach a photo, video or audio clip to a feature. Originals are stored unmodified with full capture metadata.",
+      "description": "Capture or attach a photo, video or audio clip to a feature. Originals are stored unmodified; captures record full EXIF, GNSS fix, device orientation, UTC time and, for video, a per-frame pose track. For an existing file give file_ref, and position/orientation if the file lacks them.",
       "inputSchema": {
         "type": "object",
-        "required": ["feature_id", "media_type"],
+        "required": ["feature_uuid", "media_type"],
         "properties": {
-          "feature_id": { "$ref": "#/$defs/id" },
+          "feature_uuid": { "$ref": "#/$defs/feature_uuid" },
           "media_type": { "enum": ["photo", "video", "audio"] },
           "source": { "enum": ["capture", "existing_file"], "default": "capture" },
           "file_ref": { "type": "string", "description": "Path or storage URI when source is existing_file." },
+          "position": {
+            "$ref": "#/$defs/position",
+            "description": "Where an existing file was captured, when its own metadata lacks it. Ignored for source capture: the app records the fix itself."
+          },
+          "orientation": {
+            "$ref": "#/$defs/orientation",
+            "description": "Device orientation for an existing file, when its own metadata lacks it. Ignored for source capture."
+          },
           "caption": { "type": "string" },
           "record_pose_track": { "type": "boolean", "default": true, "description": "For video: store per-frame position and orientation." }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "x-ufield-rules": { "required_if": [{ "if": { "source": "existing_file" }, "then_required": ["file_ref"] }] }
       }
     },
     {
       "name": "query_features",
-      "description": "Find features in the open project by layer, area, time or attribute filter.",
+      "description": "Find features in the open project by layer, area, time or attribute filter. Each result carries its ufield_uuid, used by the other feature, note and analysis tools.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -218,12 +236,17 @@
     },
     {
       "name": "update_feature",
-      "description": "Change attributes or geometry of an existing feature.",
+      "description": "Change attributes or geometry of an existing feature. Give at least one of attributes or geometry.",
       "inputSchema": {
         "type": "object",
-        "required": ["feature_id"],
-        "properties": { "feature_id": { "$ref": "#/$defs/id" }, "attributes": { "$ref": "#/$defs/attributes" }, "geometry": { "$ref": "#/$defs/geometry" } },
-        "additionalProperties": false
+        "required": ["feature_uuid"],
+        "properties": {
+          "feature_uuid": { "$ref": "#/$defs/feature_uuid" },
+          "attributes": { "$ref": "#/$defs/attributes" },
+          "geometry": { "$ref": "#/$defs/geometry" }
+        },
+        "additionalProperties": false,
+        "x-ufield-rules": { "at_least_one_of": [["attributes"], ["geometry"]] }
       }
     },
     {
@@ -231,8 +254,8 @@
       "description": "Delete a feature. Requires explicit confirmation; LLM and voice clients must ask the user first.",
       "inputSchema": {
         "type": "object",
-        "required": ["feature_id", "confirm"],
-        "properties": { "feature_id": { "$ref": "#/$defs/id" }, "confirm": { "const": true } },
+        "required": ["feature_uuid", "confirm"],
+        "properties": { "feature_uuid": { "$ref": "#/$defs/feature_uuid" }, "confirm": { "const": true } },
         "additionalProperties": false
       }
     },
@@ -277,7 +300,7 @@
               "layers": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "Registry or project layer ids." },
               "features": { "type": "array", "items": { "$ref": "#/$defs/feature_uuid" } },
               "notes": { "type": "array", "items": { "type": "string", "maxLength": 128 } },
-              "assets": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+              "assets": { "type": "array", "items": { "$ref": "#/$defs/asset_id" } },
               "time": { "$ref": "#/$defs/time_range" }
             },
             "additionalProperties": false
@@ -310,7 +333,8 @@
           "buffer_m": { "type": "number", "minimum": 0, "maximum": 1000, "default": 0 },
           "year": { "type": "integer", "minimum": 2000, "description": "For year-stamped layers; defaults to the latest." }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "x-ufield-rules": { "exactly_one_of": [["feature_uuids"], ["points"]] }
       }
     },
     {
@@ -362,7 +386,8 @@
           "time": { "$ref": "#/$defs/time_range" },
           "interval": { "enum": ["none", "day", "week", "month", "year"], "default": "none" }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "x-ufield-rules": { "exactly_one_of": [["feature_uuid"], ["location"]] }
       }
     },
     {
@@ -384,7 +409,8 @@
           "title": { "type": "string", "maxLength": 200, "description": "Optional; defaults to the first words of the transcript." },
           "language": { "enum": ["fi", "en", "sv", "auto"], "description": "Defaults to the voice settings language." }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "x-ufield-rules": { "required_if": [{ "if": { "source": "existing_file" }, "then_required": ["file_ref"] }] }
       }
     },
     {
@@ -430,7 +456,7 @@
     },
     {
       "name": "select_target_area",
-      "description": "Create or edit a target area: the area a Farm Pack or product is built for. Select parts by Ruokavirasto peltolohkotunnus, by MML kiinteistötunnus, or by picking the parcel or property under map points. Give at least one of field_parcel_ids, property_ids or pick_at. Each id is resolved to its boundary; the area's geometry is the union of its parts. Returns the area with its parts (id, source, area_class, hectares), total hectares, and any ids that were not found.",
+      "description": "Create or edit a target area: the area a Farm Pack or product is built for. Select parts by Ruokavirasto peltolohkotunnus, by MML kiinteistötunnus, or by picking the parcel or property under map points. Give at least one of field_parcel_ids, property_ids or pick_at, or target_area_id with a new name to rename. Each id is resolved to its boundary; the area's geometry is the union of its parts. Returns the area with its parts (id, source, area_class, hectares), total hectares, and any ids that were not found.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -467,7 +493,8 @@
           },
           "visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "x-ufield-rules": { "at_least_one_of": [["field_parcel_ids"], ["property_ids"], ["pick_at"], ["target_area_id", "name"]] }
       }
     },
     {
@@ -498,7 +525,6 @@
       "description": "Build a Farm Pack for one target area (fields, forest, other green, brownfield or urban green land): orthophotos, elevation, a Sentinel-2 season series and clipped open vector layers, packaged as GeoPackage + COGs + STAC. Give target_area_id (see select_target_area) or a drawn aoi. Runs on the server; returns a job to poll with get_job_status. Available in the MVP.",
       "inputSchema": {
         "type": "object",
-        "oneOf": [{ "required": ["target_area_id"] }, { "required": ["aoi"] }],
         "properties": {
           "target_area_id": { "$ref": "#/$defs/id", "description": "Target area from select_target_area; the pack AOI is the union of its parts." },
           "aoi": { "$ref": "#/$defs/geometry", "description": "Drawn boundary, when no target area is used." },
@@ -519,7 +545,8 @@
           },
           "output_visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "x-ufield-rules": { "exactly_one_of": [["target_area_id"], ["aoi"]] }
       }
     },
     {
@@ -530,13 +557,14 @@
         "required": ["product_type", "input_asset_ids"],
         "properties": {
           "product_type": { "enum": ["orthomosaic", "gaussian_splat_3d", "super_resolution", "dem", "index_map"] },
-          "input_asset_ids": { "type": "array", "items": { "$ref": "#/$defs/id" }, "minItems": 1 },
+          "input_asset_ids": { "type": "array", "items": { "$ref": "#/$defs/asset_id" }, "minItems": 1 },
           "aoi": { "$ref": "#/$defs/geometry" },
           "target_area_id": { "$ref": "#/$defs/id", "description": "Limit the product to a target area instead of an aoi." },
           "parameters": { "type": "object", "description": "Recipe-specific parameters." },
           "output_visibility": { "$ref": "#/$defs/visibility", "default": "proprietary" }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "x-ufield-rules": { "at_most_one_of": [["aoi"], ["target_area_id"]] }
       }
     },
     {
