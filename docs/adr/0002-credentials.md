@@ -17,6 +17,7 @@ Two paths make leaks easy in this app: every user action is also an LLM-callable
 | MML API key (Biomitta) | server | server environment / secret manager | app, repo, URLs, logs, STAC |
 | CDSE OAuth client (Biomitta) | server | server environment / secret manager | app, repo, logs |
 | Google OAuth client secret for the MCP server | server | server environment / secret manager | app, repo |
+| Anthropic API key for the voice agent (`UFIELD_ANTHROPIC_API_KEY`) | server | server environment / secret manager | app, repo, logs |
 | Play upload key, keystore passwords | CI | GitHub Actions secrets | repo, `local.properties` |
 | User's own service credentials (private WMS, own MML key) | user | on device, QGIS auth manager (encrypted auth DB) | `.qgs` files, tool inputs, synced storage, server |
 | User's Google Drive / OneDrive tokens | user | on device, Android Keystore (via qtkeychain) | `QSettings`, logs, server |
@@ -52,7 +53,7 @@ This is an explicit exception to rule 1 (tool parity):
 ### 6. How the app and MCP clients sign in to ufield-server
 
 - The app signs the user in with Google on the device, and sends the Google ID token to ufield-server once. The server verifies signature, issuer, expiry and that the audience is μField's client id, then issues its own short-lived access token and a refresh token. The app stores both in the Android Keystore.
-- The MCP server is an OAuth resource server (MCP authorization spec, Google as the authorization server). It validates that each token was issued for it (audience), and never passes a client's token on to another service.
+- The MCP server is an OAuth resource server (MCP authorization spec). ufield-server runs its own authorization server with Google as the identity provider, because MCP clients such as Claude's connectors need client registration that Google does not offer (ADR 0003 §1). It validates that each token was issued for it (audience), and never passes a client's token on to another service.
 - The server never receives the user's Google Drive or OneDrive tokens; storage sync runs on the device.
 
 ### 7. CDSE

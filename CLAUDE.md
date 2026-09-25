@@ -6,7 +6,7 @@ Guidance for Claude Code when working in this repository. Read this fully before
 
 μField is an Android field-data app forked from **Mergin Maps mobile** (GPL-3.0), published on Google Play by Biomitta Oy. Users collect text, numbers, photos and video with location and metadata, work against their own QGIS project, store data in their own storage (local folder, Google Drive, OneDrive), and view open map layers (Ruokavirasto, SYKE, MML, GTK, Luke, Peltoraportti).
 
-It is designed **API-first**: every user action is a *tool* defined in `schema/tools.json`. The same tool definitions drive the app UI, the MCP server (LLM clients), and the in-app voice agent.
+It is designed **API-first**: every user action is a *tool* defined in `schema/tools.json`. The same tool definitions drive the app UI, the MCP servers (Claude and other MCP clients), and the in-app voice agent, which uses Claude.
 
 ## Non-negotiable rules
 
@@ -26,23 +26,33 @@ It is designed **API-first**: every user action is a *tool* defined in `schema/t
 ## Architecture
 
 ```
-┌────────────── Android app (Qt 6 / QML, Mergin fork) ──────────────┐
-│  UI (QML) ──► ToolDispatcher ◄── Voice agent (STT → LLM → tools) │
-│                    │                                              │
-│                    ▼                                              │
-│  ufield/core: projects, features, media capture, layers, STAC    │
-│                    │                                              │
-│  StorageProvider: Local | GoogleDrive | OneDrive | MerginCE      │
-└───────────────────────────────────────────────────────────────────┘
+┌── Android app (Qt 6 / QML, Mergin fork) ───────────────────────────────┐
+│  UI (QML) ──► ToolDispatcher ◄── Voice agent                           │
+│                     │           (on-device or cloud STT → Claude)      │
+│                     ▼                                                  │
+│  ufield/core: projects, features, notes, media capture, layers, STAC   │
+│                     │                                                  │
+│  StorageProvider: Local | GoogleDrive | OneDrive | MerginCE            │
+└────────────────────────────────────────────────────────────────────────┘
         ▲ same tool schema
-┌───────┴─────── ufield-server (headless core) ─────────────────────┐
-│  MCP server (Streamable HTTP, Google OAuth)                       │
-│  STAC catalog · ProductJob queue (stub in MVP)                    │
-└───────────────────────────────────────────────────────────────────┘
+┌── ufield-server (headless core) ───────────────────────────────────────┐
+│  Remote MCP server (Streamable HTTP, own OAuth, Google sign-in)        │
+│  /agent: Claude API proxy for the voice agent (key stays here)         │
+│  Authenticated layer proxy · target areas · STAC catalog               │
+│  ProductJob queue: Farm Pack (other products: stub in MVP)             │
+└────────────────────────────────────────────────────────────────────────┘
+        ▲ same tool schema, same project folder
+┌── ufield-mcp (local, stdio) on the user's computer ────────────────────┐
+│  Claude Desktop / Claude Code ──► project folder (local or Drive sync) │
+│  Notes and analysis tools; server tools via the user's session         │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **ToolDispatcher** validates input against `schema/tools.json`, then calls `ufield/core`. UI, voice and MCP all go through it.
 - **StorageProvider** is an interface (`list`, `read`, `write`, `delete`, `changes_since`, `conflict_policy`). MVP: Local and GoogleDrive. OneDrive and MerginCE after.
+- **Claude:** three paths, one schema (`docs/adr/0003-claude-notes-and-voice.md`): the in-app voice agent (Claude API through ufield-server `/agent`, tools run on the phone); `ufield-mcp` in local stdio mode for Claude Desktop and Claude Code on a project folder; and the remote MCP server as a Claude custom connector for server-side tools.
+- **Notes:** Markdown per point under `notes/<ufield_uuid>/given/` (user) and `ai/` (AI), plus `analyses/` for work across points, layers and time. ToolDispatcher sets the author from the calling client; AI notes are append-only. Analysis tools: `sample_layers`, `compare_features`, `get_time_series`.
+- **Voice:** speech-to-text on the device (Android recogniser or whisper.cpp) or in the cloud; `dictation_only` mode works offline with no model.
 - **Credentials:** the app signs in with Google and exchanges the ID token for a ufield-server session; `via_server` endpoints require that session and are rate-limited. The MCP server validates token audience and never passes tokens through. See `docs/adr/0002-credentials.md`.
 - **Layers** come from `config/layers.yaml` (type, url, crs, license, attribution, auth). `scripts/check_layers.py` checks every endpoint in CI.
 - **Target areas** (`select_target_area`) are what the Farm Pack and products are built for: saved areas made of field parcels (peltolohkotunnus, Ruokavirasto), properties (kiinteistötunnus, MML) or map picks, each classed as field, forest, other green, brownfield or urban green. See `docs/adr/0001-target-areas.md`.
@@ -56,12 +66,13 @@ app/, core/          upstream Mergin Maps code (minimise changes)
 ufield/core/         μField domain logic (C++)
 ufield/tools/        ToolDispatcher + generated bindings from schema
 ufield/storage/      StorageProvider implementations
-ufield/voice/        voice agent (STT, LLM client, tool loop)
+ufield/voice/        voice agent (on-device/cloud STT, Claude client via server, tool loop)
 ufield/qml/          μField UI components
-server/              ufield-server: MCP server, STAC, job queue (Python)
+server/              ufield-server and ufield-mcp (local mode): MCP, /agent, STAC, job queue (Python)
 schema/tools.json    single source of truth for tools
 config/layers.yaml   map layer registry
 scripts/             codegen, layer checks, release helpers
+templates/project/   files added to every μField project folder (its CLAUDE.md)
 docs/                ADRs (docs/adr/NNNN-title.md), play-policy.md, dependencies.md
 .github/workflows/   CI: build, test, layer check, release to Play
 ```
@@ -84,7 +95,7 @@ docs/                ADRs (docs/adr/NNNN-title.md), play-policy.md, dependencies
 
 ## MVP scope
 
-In: fork + rebrand, CI build, Google sign-in, Local + Google Drive storage, observations (text, number, photo, video) with full capture metadata, open QGIS project, layer registry with open layers, target areas (peltolohkotunnus, kiinteistötunnus, map pick), Farm Pack, STAC catalog, tool schema, MCP server, voice input (Finnish + English), signed AAB release to Play internal track.
+In: fork + rebrand, CI build, Google sign-in, Local + Google Drive storage, observations (text, number, photo, video) with full capture metadata, open QGIS project, layer registry with open layers, target areas (peltolohkotunnus, kiinteistötunnus, map pick), Farm Pack, STAC catalog, tool schema, MCP server (remote and local, usable from Claude), point notes (given / AI Markdown) and analysis tools, voice input (Finnish + English) with on-device or cloud speech-to-text, signed AAB release to Play internal track.
 
 Out (interfaces only): product generation (ortho, 3DGS, super-resolution), OneDrive, MerginCE sync, multi-user collaboration.
 

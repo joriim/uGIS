@@ -21,7 +21,7 @@ Today the repository holds only design documents: `CLAUDE.md`, the layer registr
 | 3 | ufield-server | Auth, proxy, credentials, MCP, STAC, target areas | 4–6 weeks, parallel with 2 |
 | 4 | Google Drive storage | StorageProvider for Drive with `drive.file` | 3–4 weeks |
 | 5 | Farm Pack | `request_farm_pack` end to end | 5–7 weeks |
-| 6 | Voice agent | Finnish + English voice input driving tools | 3–5 weeks |
+| 6 | Voice, Claude and notes | Voice with on-device or cloud STT; Claude via voice agent and MCP; given/AI notes and analysis tools | 5–7 weeks |
 | 7 | Compliance and hardening | Privacy, data safety, account deletion, security review, translations | 3–4 weeks, starts during 5 |
 | 8 | Release | Closed testing → production; tagged GitHub release | 3–6 weeks incl. review |
 
@@ -43,7 +43,8 @@ Several of these have lead times of days to weeks, so start them first.
 - [ ] Google Cloud project: OAuth consent screen (brand verification: name, logo, verified domain, privacy policy), Android and web OAuth clients. `drive.file` is a non-sensitive scope, so no security assessment should be needed *(verify)*.
 - [ ] MML open-data API key for the server; read MML's terms for the open service vs a contract (small-scale use, ADR 0002 §4).
 - [ ] CDSE account for the server; confirm openEO client-credentials login (ADR 0002 §7) and whether serving app users from one account fits CDSE's terms.
-- [ ] AI providers for the voice agent (speech-to-text and LLM): pick them, sign data processing agreements, confirm EU processing and no training on user data.
+- [ ] Anthropic (Claude) as the model provider: API account, commercial terms and DPA; check data retention and processing location options.
+- [ ] Cloud speech-to-text provider: pick one, sign a DPA, confirm EU processing and no training on user data.
 - [ ] Server hosting in the EU (GDPR) and its secret manager.
 
 **Design fixes from the first review** (all in `schema/tools.json` and `config/layers.yaml`)
@@ -51,7 +52,7 @@ Several of these have lead times of days to weeks, so start them first.
 - [ ] Codegen inlines `$defs`; test that every exported tool schema stands alone.
 - [ ] Replace top-level `oneOf` with dispatcher checks (`add_layer`, `request_farm_pack`).
 - [ ] Use `position`/`orientation` in `add_observation` and `attach_media`.
-- [ ] Feature ids scoped by layer; widen the id pattern for STAC ids.
+- [ ] Stable feature ids: a `ufield_uuid` field on every layer; move existing feature tools from `feature_id` to `feature_uuid` (ADR 0003 §2); widen the id pattern for STAC ids.
 - [ ] Align `add_layer.service_type` with registry types.
 - [ ] Fill registry TODOs: layer/collection names, `id_attribute`s, licences marked "confirm". Remove Peltoraportti from `CLAUDE.md` until confirmed.
 
@@ -102,7 +103,8 @@ Several of these have lead times of days to weeks, so start them first.
 - [ ] Sign-in: Google ID token → server session (ADR 0002 §6); per-user and global rate limits.
 - [ ] Secrets loaded from the environment per the registry's `auth` section; startup fails if missing.
 - [ ] Authenticated proxy for `via_server` layers: MML via HTTP Basic, capabilities rewritten, cache without keys.
-- [ ] MCP server (Streamable HTTP, OAuth resource server) generated from the same schema.
+- [ ] MCP server (Streamable HTTP, OAuth resource server) generated from the same schema, with ufield-server's own OAuth authorization server (Google as identity provider) so it works as a Claude custom connector.
+- [ ] `/agent` endpoint: Claude API proxy for the voice agent; key from the environment; per-user cost and rate limits.
 - [ ] STAC catalog with `ufield:visibility` and `ufield:provenance`.
 - [ ] Target areas: `select_target_area`, `list_target_areas`, `delete_target_area` (ADR 0001).
 - [ ] `ProductJob` store; `request_product` returns `unavailable`; `get_job_status`.
@@ -131,15 +133,31 @@ Several of these have lead times of days to weeks, so start them first.
 
 **Exit check:** Farm Packs for three real target areas (a farm, a forest property, an urban green area) open on the phone offline and in QGIS, within the size budget, with correct attribution.
 
-## Phase 6 — Voice agent
+## Phase 6 — Voice, Claude and notes
 
-- [ ] STT (Finnish, English) → LLM tool loop → `ToolDispatcher`; same confirmations as other clients (`delete_*` asks the user).
+See `docs/adr/0003-claude-notes-and-voice.md`. Given notes (typed) can ship in phase 2; everything below builds on them.
+
+**Notes and analysis**
+- [ ] Project folder layout with `notes/<ufield_uuid>/given|ai/` and `analyses/`; `templates/project/CLAUDE.md` copied into every project.
+- [ ] `read_notes`, `write_note` (author set by `ToolDispatcher`, AI append-only), notes as STAC items.
+- [ ] `sample_layers`, `compare_features`, `get_time_series` (NDVI and weather via ufield-server).
+- [ ] App notes view: given and AI tabs per point, project analyses, analysis results (rule 1).
+
+**Claude**
+- [ ] `ufield-mcp` local stdio mode; documented setup for Claude Desktop and Claude Code on a Drive-synced project folder.
+- [ ] Remote MCP tested as a Claude custom connector (sign-in, tool calls, annotations).
+- [ ] Prompt-injection tests: instructions hidden in given notes and layer attributes must not change what Claude does without the user.
+
+**Voice**
+- [ ] STT (Finnish, English) → Claude tool loop via `/agent` → `ToolDispatcher`; same confirmations as other clients (`delete_*` asks the user).
+- [ ] On-device STT: Android recogniser where the language pack exists; whisper.cpp with a downloaded multilingual model. Measure Finnish word error rate on field vocabulary against cloud STT before choosing the default.
+- [ ] `dictation_only` mode fully offline; `keep_audio` option; `set_voice_settings`.
 - [ ] Microphone permission requested only when voice is first used; clear indicator while listening.
 - [ ] No secrets or credentials ever in the voice path (ADR 0002 §5).
 - [ ] Cost and latency limits per user; graceful offline behaviour.
 - [ ] Review Play's policy on AI-generated content for what applies to a tool-driving assistant (e.g. user reporting) *(verify)*.
 
-**Exit check:** common field tasks ("add an observation here, soil pH 5.8, take a photo") work by voice in both languages.
+**Exit check:** common field tasks ("add an observation here, soil pH 5.8, take a photo") work by voice in both languages, and by dictation offline; Claude Desktop, working on a synced project folder, can answer "how do the soil samples compare with the soil map and with last year?" and write the answer as an AI note that shows up in the app.
 
 ## Phase 7 — Compliance and hardening
 
@@ -147,7 +165,7 @@ Several of these have lead times of days to weeks, so start them first.
 - [ ] Privacy policy (Finnish and English) at a stable URL on `ufield.biomitta.fi`: what is collected, why, processors (hosting, STT, LLM, Google), retention, rights under GDPR.
 - [ ] Data processing records and DPAs with every processor.
 - [ ] **Account deletion** inside the app and on a web page, as Play requires for apps with accounts *(verify)*.
-- [ ] Play **Data safety** form: location, photos and videos, audio, account info, files; what is shared with processors; encryption in transit; deletion.
+- [ ] Play **Data safety** form: location, photos and videos, audio, account info, files; what is shared with processors; encryption in transit; deletion. Declare Anthropic (agent mode, transcripts and tool results) and the cloud STT provider; on-device STT with dictation-only shares nothing.
 - [ ] Permissions review: foreground location only (rule 8; if background is ever needed, justify it in `docs/play-policy.md` and prepare the declaration video); camera; microphone; no broad storage or media permissions.
 - [ ] Content rating questionnaire, target audience (not directed at children), ads declaration (none).
 - [ ] `docs/play-policy.md` completed with every declaration and its reasoning.
@@ -198,4 +216,5 @@ Several of these have lead times of days to weeks, so start them first.
 | MML open-service limits or CDSE free-tier terms don't fit a public app | Farm Pack blocked or throttled | Ask MML and CDSE early; budget for contract access; server caching |
 | Play policy findings (permissions, data safety, AI features) | Release delayed | Draft declarations in phase 7, not at submission; foreground-only location; photo picker |
 | Name conflict found late | Rebrand after launch; package id fixed forever | Trademark search in phase 0 before first upload |
-| LLM / STT cost per active user | Unsustainable voice feature | Per-user limits; measure in closed testing |
+| LLM / STT cost per active user | Unsustainable voice feature | Per-user limits; on-device STT and dictation-only mode; measure in closed testing |
+| On-device Finnish STT not accurate enough | Local option unusable for Finnish users | Measure early in phase 6; keep cloud STT as fallback; Android recogniser where it has Finnish |
