@@ -34,14 +34,14 @@ Rough size for a 500 ha farm in a 4 × 3 km bounding box (estimate, to be measur
 ### Why it runs on the server, not on the phone
 
 - MML's WCS limits each orthophoto request to 2 × 2 km, so a farm needs tiling and mosaicking.
-- API keys (MML, CDSE) stay on the server. MML's open service is meant for small-scale use; server-side caching keeps us within that.
+- API keys (MML, CDSE) stay on the server, and the proxy endpoints require a signed-in user so the keys can't be used anonymously. MML's open service is meant for small-scale use; server-side caching keeps us within that.
 - openEO jobs are asynchronous; the phone gets a notification when the pack is ready.
 
 ## 2. Finnish national sources
 
 ### Maanmittauslaitos (National Land Survey, NLS)
 
-- **Access:** free open-data API key from the My Account service, passed as `api-key=<key>` in the URL or as the HTTP Basic user name with an empty password.
+- **Access:** free open-data API key from the My Account service, MML accepts it as `api-key=<key>` in the URL or as the HTTP Basic user name with an empty password. **μField uses HTTP Basic only**: keys in URLs leak into logs, caches and STAC hrefs (`docs/adr/0002-credentials.md`).
 - **WMTS (open):** `https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/WMTSCapabilities.xml`. Layers include maastokartta, taustakartta, selkokartta, ortokuva, ortokuva_vaaravari, korkeusmalli_vinovalo. Tile matrix sets: ETRS-TM35FIN (zoom 0–15) and WGS84 Pseudo-Mercator (zoom 0–18). The open service is intended for testing and small-scale use; contract access removes that limit.
 - **Vector tiles:** `https://avoin-karttakuva.maanmittauslaitos.fi/vectortiles/wmts`.
 - **Orthophoto and elevation query service (WCS):** `https://avoin-karttakuva.maanmittauslaitos.fi/ortokuvat-ja-korkeusmallit/wcs/v2`. Colour, black-and-white and false-colour orthophotos at 0.5 m; DEM 2 m. Limits per request: orthophotos 2,000 × 2,000 m and 4,000 px; DEM 10,000 × 10,000 m and 5,000 px. GeoTIFF output; EPSG:3067, GK zones or 3857.

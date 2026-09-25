@@ -10,13 +10,17 @@ It is designed **API-first**: every user action is a *tool* defined in `schema/t
 
 ## Non-negotiable rules
 
-1. **Tool parity.** Any new user-facing capability must first be added to `schema/tools.json`, then implemented in `core/`, then wired to the UI, MCP server and voice agent. A UI action with no matching tool is a bug. Never implement business logic only in QML.
+1. **Tool parity.** Any new user-facing capability must first be added to `schema/tools.json`, then implemented in `core/`, then wired to the UI, MCP server and voice agent. A UI action with no matching tool is a bug. Never implement business logic only in QML. **Exception: secrets.** Entering, viewing or exporting a credential is native-UI only; no tool accepts a secret, and tools refer to stored credentials only by `auth_config_id` (`docs/adr/0002-credentials.md`).
 2. **Stay close to upstream.** Put μField code in `ufield/` modules. Change upstream files (`app/`, `core/` from Mergin) only when unavoidable, keep the diff minimal, and mark it with `// UFIELD:` plus a one-line reason. We rebase on upstream regularly.
 3. **GPL-3.0.** Keep upstream license headers. All code in this repo is GPL-3.0. Do not add dependencies with incompatible licenses (check before adding; record them in `docs/dependencies.md`).
 4. **No Mergin branding.** Use the μField name, icons and package ID `fi.biomitta.ufield`. Don't reintroduce Mergin trademarks in UI strings or assets. The display name is written with the Greek letter mu, `μField` (U+03BC, not the micro sign U+00B5); identifiers, paths, package IDs, STAC prefixes and URLs use ASCII `ufield`.
 5. **Capture fidelity.** Never recompress or strip metadata from originals. Every photo/video capture stores: full EXIF, GNSS fix (lat, lon, alt, horizontal/vertical accuracy, fix type incl. RTK status, satellite count), device orientation (azimuth, pitch, roll), timestamp (UTC), and for video a per-frame pose/GNSS track. These feed future ortho, 3DGS and super-resolution products.
 6. **Provenance and licence on every asset.** Each asset (capture, imported layer, product) is a STAC item with `ufield:visibility` (`proprietary` | `public`), `license`, and `ufield:provenance` (input asset IDs + recipe). Never merge proprietary and public data into an output without recording both.
-7. **Secrets.** No keys, tokens or signing material in the repo. Use GitHub Actions secrets and `local.properties` (git-ignored).
+7. **Secrets.** No keys, tokens or signing material in the repo. Details: `docs/adr/0002-credentials.md`.
+   - Server secrets (MML key, CDSE client, OAuth client secrets) live only in ufield-server's environment, named in the `auth` section of `config/layers.yaml`. Never in the app: anything compiled in (BuildConfig, resources, `local.properties` values) is extractable.
+   - CI and signing secrets live in GitHub Actions secrets. `local.properties` (git-ignored) holds build configuration only, never a runtime key.
+   - User credentials stay on the device: service credentials in the QGIS auth manager, tokens in the Android Keystore (qtkeychain), never in `QSettings`, `.qgs` files or synced storage.
+   - Never put a key in a URL: MML keys go in HTTP Basic auth. Never log request URLs or headers of authenticated requests.
 8. **Google Play.** Target API 36. Request the Google Drive `drive.file` scope only — never full `drive`. Background location only if a feature truly needs it, with a written justification in `docs/play-policy.md`.
 
 ## Architecture
@@ -39,6 +43,7 @@ It is designed **API-first**: every user action is a *tool* defined in `schema/t
 
 - **ToolDispatcher** validates input against `schema/tools.json`, then calls `ufield/core`. UI, voice and MCP all go through it.
 - **StorageProvider** is an interface (`list`, `read`, `write`, `delete`, `changes_since`, `conflict_policy`). MVP: Local and GoogleDrive. OneDrive and MerginCE after.
+- **Credentials:** the app signs in with Google and exchanges the ID token for a ufield-server session; `via_server` endpoints require that session and are rate-limited. The MCP server validates token audience and never passes tokens through. See `docs/adr/0002-credentials.md`.
 - **Layers** come from `config/layers.yaml` (type, url, crs, license, attribution, auth). `scripts/check_layers.py` checks every endpoint in CI.
 - **Target areas** (`select_target_area`) are what the Farm Pack and products are built for: saved areas made of field parcels (peltolohkotunnus, Ruokavirasto), properties (kiinteistötunnus, MML) or map picks, each classed as field, forest, other green, brownfield or urban green. See `docs/adr/0001-target-areas.md`.
 - **Farm Pack** is the one product built in the MVP (`request_farm_pack`): server-side fetch of MML ortho/DEM (WCS, tiled at 2 × 2 km), a CDSE openEO Sentinel-2 season series and clipped open vector layers, delivered as GeoPackage + COGs + STAC. Sources and limits: `docs/layer-sources.md`.

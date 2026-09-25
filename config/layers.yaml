@@ -6,7 +6,7 @@
 #   type         wms | wmts | wfs | wcs | ogcapi_features | ogcapi_processes | openeo | vector_tiles
 #   url          service base URL (capabilities are fetched at runtime)
 #   layers       layer / feature type names; {year} is resolved to the latest available year
-#   auth         none | mml_api_key | cdse_oauth  (secrets live on ufield-server, never in the app)
+#   auth         none | an id from the auth section below (secrets live on ufield-server, never in the app)
 #   via_server   true = the app must go through ufield-server (key hiding, caching, tiling)
 #   farm_pack    role in the Farm Pack product, or null
 #   target_area  field_parcel | property: this layer resolves ids for select_target_area
@@ -15,6 +15,21 @@
 #   verified     date the endpoint was last checked by scripts/check_layers.py
 
 version: 1
+
+# Server-side credentials, see docs/adr/0002-credentials.md.
+#   secret  environment variable ufield-server reads at startup; it refuses to start
+#           if a secret used by an enabled layer is missing. Values never go in this file.
+#   apply   basic_user                = HTTP Basic, secret as user name, empty password
+#           oauth_client_credentials = secret is "client_id:client_secret"; bearer token fetched and refreshed by the server
+#   Never apply a secret as a URL query parameter.
+auth:
+  mml_api_key:
+    secret: UFIELD_MML_API_KEY
+    apply: basic_user
+  cdse_oauth:
+    secret: UFIELD_CDSE_CLIENT
+    apply: oauth_client_credentials     # TODO: confirm CDSE openEO accepts client credentials (ADR 0002 §7)
+    token_url: https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token   # TODO: verify
 
 providers:
   mml:

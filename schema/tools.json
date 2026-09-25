@@ -48,6 +48,19 @@
 
     "visibility": { "enum": ["proprietary", "public"] },
 
+    "auth_config_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]{7}$",
+      "description": "Id of a credential stored in the QGIS auth manager on the device. The secret itself is never passed to or returned by any tool."
+    },
+
+    "credential_free_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Service URL without credentials. URLs with user:password@ or a key/token query parameter are rejected; add the credential in settings and pass auth_config_id. ToolDispatcher repeats this check case-insensitively.",
+      "not": { "pattern": "^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*@|[?&]([Aa][Pp][Ii][-_]?[Kk][Ee][Yy]|[Kk][Ee][Yy]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Cc][Cc][Ee][Ss][Ss][-_]?[Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ii][Gg])=" }
+    },
+
     "field_parcel_id": {
       "type": "string",
       "pattern": "^[0-9]{10}$",
@@ -128,7 +141,7 @@
     },
     {
       "name": "add_layer",
-      "description": "Add a layer to the open project, either from the registry by id or from a service URL.",
+      "description": "Add a layer to the open project, either from the registry by id or from a service URL. For a service that needs a login or key, the user first adds the credential in settings (never through a tool); pass its auth_config_id. URLs containing credentials are rejected.",
       "inputSchema": {
         "type": "object",
         "oneOf": [
@@ -137,10 +150,35 @@
         ],
         "properties": {
           "registry_id": { "$ref": "#/$defs/id" },
-          "url": { "type": "string", "format": "uri" },
+          "url": { "$ref": "#/$defs/credential_free_url" },
           "service_type": { "enum": ["wms", "wmts", "wfs", "xyz", "cog", "geopackage"] },
+          "auth_config_id": { "$ref": "#/$defs/auth_config_id", "description": "Stored credential to use with url (see list_credentials)." },
           "layer_name": { "type": "string" },
           "visible": { "type": "boolean", "default": true }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_credentials",
+      "description": "List credentials the user has stored on this device for map services: id, name, method and host only. Secrets are never returned. Credentials are added and edited only in the app's settings screen.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "host": { "type": "string", "description": "Only credentials for this host, e.g. 'example.org'." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "delete_credential",
+      "description": "Delete a stored credential. Layers using it stop loading until a new credential is set. Requires explicit confirmation; LLM and voice clients must ask the user first.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["auth_config_id", "confirm"],
+        "properties": {
+          "auth_config_id": { "$ref": "#/$defs/auth_config_id" },
+          "confirm": { "const": true }
         },
         "additionalProperties": false
       }
