@@ -9,7 +9,7 @@ CLAUDE.md                     this file
 <project>.qgz                 QGIS project
 data.gpkg                     features; every layer has a ufield_uuid field
 media/                        original photos, video and audio — never modify
-notes/<feature_uuid>/given/   notes from the user (typed or transcribed speech)
+notes/<feature_uuid>/given/   notes from the user (typed, or voice notes transcribed in the cloud)
 notes/<feature_uuid>/ai/      AI analysis of one point
 analyses/                     AI analysis across points, against map layers, over time
 catalog.json                  STAC catalog: provenance and licence for every asset
@@ -23,7 +23,8 @@ catalog.json                  STAC catalog: provenance and licence for every ass
 4. **Cite sources.** List in `sources` every layer, feature, note and time range you used. Carry the licence and attribution of each source layer into the note.
 5. **Separate facts from interpretation.** Measurements and layer values are facts; conclusions and recommendations are yours. Say how sure you are and what data would change the conclusion.
 6. **Write in the language of the user's notes** (Finnish by default).
-7. **Coordinates:** stored and exchanged in EPSG:4326; distances and areas are computed in EPSG:3067.
+7. **Pending voice notes** (`transcription.status: pending` or `failed`) have audio but no text yet. Don't treat them as empty; say they are waiting for transcription.
+8. **Coordinates:** stored and exchanged in EPSG:4326; distances and areas are computed in EPSG:3067.
 
 ## Note format
 

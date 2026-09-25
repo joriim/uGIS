@@ -18,6 +18,7 @@ Two paths make leaks easy in this app: every user action is also an LLM-callable
 | CDSE OAuth client (Biomitta) | server | server environment / secret manager | app, repo, logs |
 | Google OAuth client secret for the MCP server | server | server environment / secret manager | app, repo |
 | Anthropic API key for the voice agent (`UFIELD_ANTHROPIC_API_KEY`) | server | server environment / secret manager | app, repo, logs |
+| Cloud speech-to-text key (`UFIELD_STT_API_KEY`) | server | server environment / secret manager | app, repo, logs |
 | Play upload key, keystore passwords | CI | GitHub Actions secrets | repo, `local.properties` |
 | User's own service credentials (private WMS, own MML key) | user | on device, QGIS auth manager (encrypted auth DB) | `.qgs` files, tool inputs, synced storage, server |
 | User's Google Drive / OneDrive tokens | user | on device, Android Keystore (via qtkeychain) | `QSettings`, logs, server |

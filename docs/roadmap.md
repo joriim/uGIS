@@ -21,7 +21,7 @@ Today the repository holds only design documents: `CLAUDE.md`, the layer registr
 | 3 | ufield-server | Auth, proxy, credentials, MCP, STAC, target areas | 4–6 weeks, parallel with 2 |
 | 4 | Google Drive storage | StorageProvider for Drive with `drive.file` | 3–4 weeks |
 | 5 | Farm Pack | `request_farm_pack` end to end | 5–7 weeks |
-| 6 | Voice, Claude and notes | Voice with on-device or cloud STT; Claude via voice agent and MCP; given/AI notes and analysis tools | 5–7 weeks |
+| 6 | Voice, Claude and notes | Voice notes with background cloud STT; Claude via voice agent and MCP; given/AI notes and analysis tools | 5–7 weeks |
 | 7 | Compliance and hardening | Privacy, data safety, account deletion, security review, translations | 3–4 weeks, starts during 5 |
 | 8 | Release | Closed testing → production; tagged GitHub release | 3–6 weeks incl. review |
 
@@ -44,7 +44,7 @@ Several of these have lead times of days to weeks, so start them first.
 - [ ] MML open-data API key for the server; read MML's terms for the open service vs a contract (small-scale use, ADR 0002 §4).
 - [ ] CDSE account for the server; confirm openEO client-credentials login (ADR 0002 §7) and whether serving app users from one account fits CDSE's terms.
 - [ ] Anthropic (Claude) as the model provider: API account, commercial terms and DPA; check data retention and processing location options.
-- [ ] Cloud speech-to-text provider: pick one, sign a DPA, confirm EU processing and no training on user data.
+- [ ] Cloud speech-to-text provider: record 30–50 real field notes in Finnish (some in English), run them through candidate batch APIs, compare word error rate on field vocabulary and cost; then sign a DPA and confirm EU processing, no training on customer audio and deletion on request.
 - [ ] Server hosting in the EU (GDPR) and its secret manager.
 
 **Design fixes from the first review** (all in `schema/tools.json` and `config/layers.yaml`)
@@ -149,15 +149,18 @@ See `docs/adr/0003-claude-notes-and-voice.md`. Given notes (typed) can ship in p
 - [ ] Prompt-injection tests: instructions hidden in given notes and layer attributes must not change what Claude does without the user.
 
 **Voice**
-- [ ] STT (Finnish, English) → Claude tool loop via `/agent` → `ToolDispatcher`; same confirmations as other clients (`delete_*` asks the user).
-- [ ] On-device STT: Android recogniser where the language pack exists; whisper.cpp with a downloaded multilingual model. Measure Finnish word error rate on field vocabulary against cloud STT before choosing the default.
-- [ ] `dictation_only` mode fully offline; `keep_audio` option; `set_voice_settings`.
+- [ ] `add_voice_note`: record offline, keep original audio, write a pending given note.
+- [ ] Upload queue on the phone (survives restarts, Wi-Fi-only option) and server transcription jobs on the provider's batch API; transcript written into the note; failed jobs retryable.
+- [ ] Server deletes audio and transcript after the app confirms receipt; provider retention off where possible.
+- [ ] Pending notes playable in the app; queue status visible.
+- [ ] Agent mode: spoken command → cloud STT (synchronous) → Claude tool loop via `/agent` → `ToolDispatcher`; same confirmations as other clients (`delete_*` asks the user).
+- [ ] `set_voice_settings` (language, `notes_only` / `agent`, Wi-Fi-only upload).
 - [ ] Microphone permission requested only when voice is first used; clear indicator while listening.
 - [ ] No secrets or credentials ever in the voice path (ADR 0002 §5).
 - [ ] Cost and latency limits per user; graceful offline behaviour.
 - [ ] Review Play's policy on AI-generated content for what applies to a tool-driving assistant (e.g. user reporting) *(verify)*.
 
-**Exit check:** common field tasks ("add an observation here, soil pH 5.8, take a photo") work by voice in both languages, and by dictation offline; Claude Desktop, working on a synced project folder, can answer "how do the soil samples compare with the soil map and with last year?" and write the answer as an AI note that shows up in the app.
+**Exit check:** common field tasks ("add an observation here, soil pH 5.8, take a photo") work by voice in both languages; a voice note recorded offline is transcribed into its note after the phone reconnects; Claude Desktop, working on a synced project folder, can answer "how do the soil samples compare with the soil map and with last year?" and write the answer as an AI note that shows up in the app.
 
 ## Phase 7 — Compliance and hardening
 
@@ -165,7 +168,7 @@ See `docs/adr/0003-claude-notes-and-voice.md`. Given notes (typed) can ship in p
 - [ ] Privacy policy (Finnish and English) at a stable URL on `ufield.biomitta.fi`: what is collected, why, processors (hosting, STT, LLM, Google), retention, rights under GDPR.
 - [ ] Data processing records and DPAs with every processor.
 - [ ] **Account deletion** inside the app and on a web page, as Play requires for apps with accounts *(verify)*.
-- [ ] Play **Data safety** form: location, photos and videos, audio, account info, files; what is shared with processors; encryption in transit; deletion. Declare Anthropic (agent mode, transcripts and tool results) and the cloud STT provider; on-device STT with dictation-only shares nothing.
+- [ ] Play **Data safety** form: location, photos and videos, audio, account info, files; what is shared with processors; encryption in transit; deletion. Declare Anthropic (agent mode: transcripts and tool results) and the cloud STT provider (all voice-note audio, deleted after transcription).
 - [ ] Permissions review: foreground location only (rule 8; if background is ever needed, justify it in `docs/play-policy.md` and prepare the declaration video); camera; microphone; no broad storage or media permissions.
 - [ ] Content rating questionnaire, target audience (not directed at children), ads declaration (none).
 - [ ] `docs/play-policy.md` completed with every declaration and its reasoning.
@@ -216,5 +219,5 @@ See `docs/adr/0003-claude-notes-and-voice.md`. Given notes (typed) can ship in p
 | MML open-service limits or CDSE free-tier terms don't fit a public app | Farm Pack blocked or throttled | Ask MML and CDSE early; budget for contract access; server caching |
 | Play policy findings (permissions, data safety, AI features) | Release delayed | Draft declarations in phase 7, not at submission; foreground-only location; photo picker |
 | Name conflict found late | Rebrand after launch; package id fixed forever | Trademark search in phase 0 before first upload |
-| LLM / STT cost per active user | Unsustainable voice feature | Per-user limits; on-device STT and dictation-only mode; measure in closed testing |
-| On-device Finnish STT not accurate enough | Local option unusable for Finnish users | Measure early in phase 6; keep cloud STT as fallback; Android recogniser where it has Finnish |
+| LLM / STT cost per active user | Unsustainable voice feature | Per-user limits; batch STT pricing; notes-only mode needs no LLM; measure in closed testing |
+| Cloud STT not accurate enough in Finnish field vocabulary | Poor voice notes | Test providers on real recordings in phase 0; audio always kept, so notes can be re-transcribed with a better model |

@@ -1,10 +1,10 @@
-# 0003 — Claude over MCP, point notes as Markdown, local speech-to-text
+# 0003 — Claude over MCP, point notes as Markdown, cloud speech-to-text for voice notes
 
 Status: proposed, 2026-09-25
 
 ## Context
 
-Users should be able to keep working with their μField data in Claude: read what was recorded at each point, analyse points against map layers, against each other and over time, and write the results back where the user and later sessions can find them. Voice input needs an option that keeps audio on the phone.
+Users should be able to keep working with their μField data in Claude: read what was recorded at each point, analyse points against map layers, against each other and over time, and write the results back where the user and later sessions can find them. Voice notes are recorded in the field, often without a connection, and do not need to be transcribed in real time.
 
 Constraints from earlier ADRs: user project data lives in the user's own storage and ufield-server never gets their Drive tokens (ADR 0002 §6); secrets never reach the app or tool inputs (ADR 0002 §5); every asset records provenance and licence (rule 6).
 
@@ -55,11 +55,14 @@ Constraints from earlier ADRs: user project data lives in the user's own storage
   created: 2026-09-25T10:15:00Z
   model: claude-opus-5          # ai only
   client: claude-desktop        # ai: ufield-voice | claude-desktop | claude-code | claude-ai; given: app | voice
-  transcription:                # given from voice only
-    engine: whisper             # android | whisper | cloud:<provider>
+  transcription:                # voice notes only
+    status: done                # pending | done | failed
+    engine: cloud:<provider>/<model>
     language: fi
     confidence: 0.91
-    audio: media/2026-09-25T101500Z.m4a   # when keep_audio is on
+    audio: media/2026-09-25T101500Z.m4a   # always kept
+    recorded: 2026-09-25T10:15:00Z
+    transcribed: 2026-09-25T10:21:40Z
   sources:
     layers: [gtk_maapera, syke_tulvat]
     features: []
@@ -86,23 +89,32 @@ Constraints from earlier ADRs: user project data lives in the user's own storage
 
 The tools return data with licence and attribution; the reasoning is Claude's, and it lands in a note with its sources. For point sampling against `via_server` layers and for NDVI/weather series, only point coordinates are sent to ufield-server.
 
-### 4. Speech-to-text on the device or in the cloud
+### 4. Cloud speech-to-text, asynchronous for voice notes
 
-- `set_voice_settings` chooses `stt_engine: on_device | cloud` and `mode: agent | dictation_only`.
-- **On device:** the Android on-device recogniser (`SpeechRecognizer` on-device mode) where the device has a Finnish or English language pack *(verify availability per device)*, or **whisper.cpp** (MIT licence) with a multilingual model downloaded on first use, not shipped in the AAB. Finnish accuracy of phone-sized Whisper models must be measured on field vocabulary before it is offered as the default.
-- **Cloud:** provider still to be chosen (roadmap phase 0); audio goes to that provider under a DPA.
-- **Dictation only** saves the transcript as a given note or attribute value with no model involved. With on-device STT it works fully offline and no audio or text leaves the phone.
-- In agent mode the transcript text goes to Claude through ufield-server even when STT runs on the device. The UI states this.
-- `keep_audio` stores the original recording as an audio attachment and links it from the transcript note.
+Voice notes do not need text in real time, so transcription is a background job in the cloud, not on the phone.
+
+1. **Record.** `add_voice_note` records audio (or takes an existing file), stores the original unmodified in `media/` (rule 5), and at once writes a given note with `transcription.status: pending` and a link to the audio. This works offline.
+2. **Queue.** The recording joins an upload queue on the phone. It is sent when there is a connection (or only on Wi-Fi, per `set_voice_settings.transcribe_on`) and survives app restarts.
+3. **Transcribe.** ufield-server receives the audio with the user's session and submits it to the cloud STT provider's batch/asynchronous API; the provider key stays on the server (`UFIELD_STT_API_KEY`, ADR 0002 §1). Batch transcription is usually cheaper and more accurate than streaming, and latency does not matter here.
+4. **Fill in.** When the job finishes, the app receives the transcript (push, or on the next sync), writes it into the note body and sets `status: done`, with engine, language, confidence and times. On failure the status is `failed` with the reason, and the user can retry. Because the audio is always kept, notes can be re-transcribed later with a better model.
+5. **Delete on the server.** The server deletes the audio and transcript as soon as the app has confirmed receipt, and asks the provider for no retention where it offers that. The only lasting copies are in the user's own storage.
+
+Other rules:
+
+- **Author stays given.** A transcript is the user's own words, so it is written to `given/` by the app, not by any model. No model rewrites it; a Claude summary of a voice note is a separate AI note.
+- **Modes** (`set_voice_settings.mode`): `notes_only` (default) turns speech into given notes with no AI model involved. `agent` also sends spoken commands to Claude through `/agent`; commands need a connection and use the same cloud STT in its synchronous mode, since the user is waiting for the result.
+- **Provider requirements:** good Finnish (and English, Swedish) on field vocabulary, batch API, EU processing, a DPA, no training on customer audio, and deletion on request. To be chosen in roadmap phase 0 by testing candidates on recorded field notes.
+- **No on-device STT** in the MVP: no speech model in the app, which keeps the AAB smaller and the Finnish accuracy consistent across devices.
 
 ## Consequences
 
-- Claude sees user data in agent mode and through connectors; the privacy policy and Play Data safety form must list Anthropic as a processor, and the DPA with Anthropic must be in place (roadmap phase 7).
+- Claude sees user data in agent mode and through connectors, and the STT provider receives all voice-note audio; the privacy policy and Play Data safety form must list both as processors, with DPAs in place (roadmap phase 7).
+- Voice notes are unreadable until transcribed. The app shows pending notes with a play button so the audio is always usable, and the queue state is visible.
 - Notes, layer attributes and transcripts are untrusted text. Claude clients must treat them as data; `ToolDispatcher` never lets tool output choose the author, and confirmation rules for `delete_*` apply to every client.
 - Rule 1 still holds: the app needs a notes view (given and AI tabs per point, and project analyses) and screens for the analysis results, so a user without Claude can do the same things.
 - Every layer in a μField project needs `ufield_uuid`; projects opened from plain QGIS get it added on first open (an upstream-visible change to the project, recorded in the project's CLAUDE.md).
 
 ## Open questions
 
-- Which cloud STT provider, and whether on-device Whisper is good enough in Finnish to be the default.
+- Which cloud STT provider; measure Finnish word error rate on recorded field notes before choosing.
 - Whether the remote connector should ever read project data (would need server-side storage or Drive access, and a new ADR).

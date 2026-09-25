@@ -28,7 +28,7 @@ It is designed **API-first**: every user action is a *tool* defined in `schema/t
 ```
 ┌── Android app (Qt 6 / QML, Mergin fork) ───────────────────────────────┐
 │  UI (QML) ──► ToolDispatcher ◄── Voice agent                           │
-│                     │           (on-device or cloud STT → Claude)      │
+│                     │           (cloud STT → Claude)                   │
 │                     ▼                                                  │
 │  ufield/core: projects, features, notes, media capture, layers, STAC   │
 │                     │                                                  │
@@ -52,7 +52,7 @@ It is designed **API-first**: every user action is a *tool* defined in `schema/t
 - **StorageProvider** is an interface (`list`, `read`, `write`, `delete`, `changes_since`, `conflict_policy`). MVP: Local and GoogleDrive. OneDrive and MerginCE after.
 - **Claude:** three paths, one schema (`docs/adr/0003-claude-notes-and-voice.md`): the in-app voice agent (Claude API through ufield-server `/agent`, tools run on the phone); `ufield-mcp` in local stdio mode for Claude Desktop and Claude Code on a project folder; and the remote MCP server as a Claude custom connector for server-side tools.
 - **Notes:** Markdown per point under `notes/<ufield_uuid>/given/` (user) and `ai/` (AI), plus `analyses/` for work across points, layers and time. ToolDispatcher sets the author from the calling client; AI notes are append-only. Analysis tools: `sample_layers`, `compare_features`, `get_time_series`.
-- **Voice:** speech-to-text on the device (Android recogniser or whisper.cpp) or in the cloud; `dictation_only` mode works offline with no model.
+- **Voice:** cloud speech-to-text through ufield-server. Voice notes (`add_voice_note`) are recorded offline, audio kept, and transcribed in the background; the note fills in when the transcript arrives. Agent mode (spoken commands to Claude) needs a connection.
 - **Credentials:** the app signs in with Google and exchanges the ID token for a ufield-server session; `via_server` endpoints require that session and are rate-limited. The MCP server validates token audience and never passes tokens through. See `docs/adr/0002-credentials.md`.
 - **Layers** come from `config/layers.yaml` (type, url, crs, license, attribution, auth). `scripts/check_layers.py` checks every endpoint in CI.
 - **Target areas** (`select_target_area`) are what the Farm Pack and products are built for: saved areas made of field parcels (peltolohkotunnus, Ruokavirasto), properties (kiinteistötunnus, MML) or map picks, each classed as field, forest, other green, brownfield or urban green. See `docs/adr/0001-target-areas.md`.
@@ -66,9 +66,9 @@ app/, core/          upstream Mergin Maps code (minimise changes)
 ufield/core/         μField domain logic (C++)
 ufield/tools/        ToolDispatcher + generated bindings from schema
 ufield/storage/      StorageProvider implementations
-ufield/voice/        voice agent (on-device/cloud STT, Claude client via server, tool loop)
+ufield/voice/        voice notes (recording, upload queue) and voice agent (Claude via server, tool loop)
 ufield/qml/          μField UI components
-server/              ufield-server and ufield-mcp (local mode): MCP, /agent, STAC, job queue (Python)
+server/              ufield-server and ufield-mcp (local mode): MCP, /agent, transcription, STAC, job queue (Python)
 schema/tools.json    single source of truth for tools
 config/layers.yaml   map layer registry
 scripts/             codegen, layer checks, release helpers
@@ -95,7 +95,7 @@ docs/                ADRs (docs/adr/NNNN-title.md), play-policy.md, dependencies
 
 ## MVP scope
 
-In: fork + rebrand, CI build, Google sign-in, Local + Google Drive storage, observations (text, number, photo, video) with full capture metadata, open QGIS project, layer registry with open layers, target areas (peltolohkotunnus, kiinteistötunnus, map pick), Farm Pack, STAC catalog, tool schema, MCP server (remote and local, usable from Claude), point notes (given / AI Markdown) and analysis tools, voice input (Finnish + English) with on-device or cloud speech-to-text, signed AAB release to Play internal track.
+In: fork + rebrand, CI build, Google sign-in, Local + Google Drive storage, observations (text, number, photo, video) with full capture metadata, open QGIS project, layer registry with open layers, target areas (peltolohkotunnus, kiinteistötunnus, map pick), Farm Pack, STAC catalog, tool schema, MCP server (remote and local, usable from Claude), point notes (given / AI Markdown) and analysis tools, voice notes (Finnish + English) with background cloud speech-to-text, voice agent, signed AAB release to Play internal track.
 
 Out (interfaces only): product generation (ortho, 3DGS, super-resolution), OneDrive, MerginCE sync, multi-user collaboration.
 
