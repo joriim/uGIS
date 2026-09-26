@@ -34,10 +34,11 @@ Constraints from earlier ADRs: user project data lives in the user's own storage
   media/                        originals (rule 5)
   notes/
     <feature_uuid>/
-      given/<created>_<slug>.md user: typed notes, verbatim transcripts
-      ai/<created>_<slug>.md    AI: analysis of this point
-  analyses/<created>_<slug>.md  AI: across points, against layers, over time
-  catalog.json                  STAC
+      given/<id>_<slug>.md      user: typed notes, verbatim transcripts
+      ai/<id>_<slug>.md         AI: analysis of this point
+    _project/given/<id>_<slug>.md  user: notes on several points or the whole project
+  analyses/<id>_<slug>.md       AI: across points, against layers, over time
+  catalog.json                  STAC catalog, linking catalog/items/<id>.json (one item per note)
 ```
 
 - **Stable ids.** Notes are keyed by `ufield_uuid`, not the QGIS fid, so they survive sync and edits. Every μField layer gets this field; existing feature tools move to it (roadmap phase 0).
@@ -74,7 +75,8 @@ Constraints from earlier ADRs: user project data lives in the user's own storage
   ---
   ```
 
-- Each note is also a STAC item (rule 6), with its sources as provenance.
+- Each note is also a STAC item (rule 6) in `catalog/items/<id>.json`, with its sources as provenance and the licences of its source layers; `catalog.json` links it. Note ids are `<UTC time>-<6 hex>`; files are created exclusively, so a note is never overwritten.
+- Implemented in `server/src/ufield/project.py` (used by `ufield-mcp`); the app follows the same layout.
 - Plain Markdown in the project folder means users can read notes in any editor, in QGIS, or in Obsidian, and Claude Code can work on the folder directly.
 
 ### 3. Analysis tools

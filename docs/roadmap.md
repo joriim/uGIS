@@ -100,7 +100,8 @@ Several of these have lead times of days to weeks, so start them first.
 
 ## Phase 3 — ufield-server (parallel with phase 2)
 
-- [ ] Python project in `server/` (`uv`, `pytest`), container image, deploy to the chosen EU host from CI.
+- [x] Python project in `server/` (`uv`, `pytest`) with `ToolDispatcher` (schema, `x-ufield-rules`, credential-free URLs); tests in CI.
+- [ ] Container image, deploy to the chosen EU host from CI.
 - [ ] Sign-in: Google ID token → server session (ADR 0002 §6); per-user and global rate limits.
 - [ ] Secrets loaded from the environment per the registry's `auth` section; startup fails if missing.
 - [ ] Authenticated proxy for `via_server` layers: MML via HTTP Basic, capabilities rewritten, cache without keys.
@@ -140,12 +141,12 @@ See `docs/adr/0003-claude-notes-and-voice.md`. Given notes (typed) can ship in p
 
 **Notes and analysis**
 - [ ] Project folder layout with `notes/<ufield_uuid>/given|ai/` and `analyses/`; `templates/project/CLAUDE.md` copied into every project.
-- [ ] `read_notes`, `write_note` (author set by `ToolDispatcher`, AI append-only), notes as STAC items.
+- [x] `read_notes`, `write_note` (author set by `ToolDispatcher`, AI append-only), notes as STAC items: `server/src/ufield/project.py`.
 - [ ] `sample_layers`, `compare_features`, `get_time_series` (NDVI and weather via ufield-server).
 - [ ] App notes view: given and AI tabs per point, project analyses, analysis results (rule 1).
 
 **Claude**
-- [ ] `ufield-mcp` local stdio mode; documented setup for Claude Desktop and Claude Code on a Drive-synced project folder.
+- [x] `ufield-mcp` local stdio mode with `read_notes` / `write_note`; setup for Claude Desktop and Claude Code in `server/README.md`. Analysis tools still to add.
 - [ ] Remote MCP tested as a Claude custom connector (sign-in, tool calls, annotations).
 - [ ] Prompt-injection tests: instructions hidden in given notes and layer attributes must not change what Claude does without the user.
 

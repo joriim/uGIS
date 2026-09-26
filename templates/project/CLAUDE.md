@@ -11,8 +11,9 @@ data.gpkg                     features; every layer has a ufield_uuid field
 media/                        original photos, video and audio — never modify
 notes/<feature_uuid>/given/   notes from the user (typed, or voice notes transcribed in the cloud)
 notes/<feature_uuid>/ai/      AI analysis of one point
+notes/_project/given/         notes from the user on several points or the whole project
 analyses/                     AI analysis across points, against map layers, over time
-catalog.json                  STAC catalog: provenance and licence for every asset
+catalog.json, catalog/items/  STAC catalog: provenance and licence for every asset, one item per note
 ```
 
 ## Rules for AI clients

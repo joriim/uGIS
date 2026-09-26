@@ -1,0 +1,33 @@
+[project]
+name = "ufield-server"
+version = "0.1.0"
+description = "μField server and local MCP server (ufield-mcp)"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.11"
+dependencies = [
+    "jsonschema>=4.18",
+    "PyYAML>=6.0",
+    "mcp>=2.2,<3",
+]
+
+[project.scripts]
+ufield-mcp = "ufield.mcp_local:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ufield"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"../schema/tools.json" = "ufield/data/tools.json"
+"../config/layers.yaml" = "ufield/data/layers.yaml"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
